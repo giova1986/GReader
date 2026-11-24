@@ -170,4 +170,3 @@ internal fun rememberGeminiModels(apiKey: String): List<String>? {
 }
 
 private val KEY_TYPING_DELAY = 1.seconds
-
