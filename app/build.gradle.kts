@@ -311,6 +311,9 @@ dependencies {
     implementation(libs.bundles.markdown)
     implementation(libs.materialKolor)
 
+    // On-device OCR and translation of pages
+    implementation(libs.bundles.mlkit)
+
     // Logging
     implementation(libs.logcat)
 

@@ -57,6 +57,8 @@ markdown = "0.46.0"
 material = "1.14.0"
 materialKolor = "5.0.1"
 metro = "1.6.0"
+mlkit-textRecognition = "16.0.1"
+mlkit-translate = "17.0.3"
 mockk = "1.14.12"
 moko-resources = "0.26.4"
 okhttp = "5.5.1"
@@ -169,6 +171,11 @@ materialKolor = { module = "com.materialkolor:material-kolor", version.ref = "ma
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 metrox-viewmodel = { module = "dev.zacsweers.metro:metrox-viewmodel", version.ref = "metro" }
 metrox-viewmodel-compose = { module = "dev.zacsweers.metro:metrox-viewmodel-compose", version.ref = "metro" }
+mlkit-textRecognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkit-textRecognition" }
+mlkit-textRecognition-japanese = { module = "com.google.mlkit:text-recognition-japanese", version.ref = "mlkit-textRecognition" }
+mlkit-textRecognition-korean = { module = "com.google.mlkit:text-recognition-korean", version.ref = "mlkit-textRecognition" }
+mlkit-textRecognition-latin = { module = "com.google.mlkit:text-recognition", version.ref = "mlkit-textRecognition" }
+mlkit-translate = { module = "com.google.mlkit:translate", version.ref = "mlkit-translate" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 moko-resources = { module = "dev.icerock.moko:resources", version.ref = "moko-resources" }
 natural-comparator = { module = "com.github.gpanther:java-nat-sort", version = "natural-comparator-1.1" }
@@ -226,6 +233,7 @@ androidx-navigation3 = ["androidx-navigation3-runtime", "androidx-navigation3-ui
 coil = ["coil-core", "coil-gif", "coil-compose", "coil-network-okhttp"]
 kotlinx-coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android", "kotlinx-coroutines-guava"]
 markdown = ["markdown-core", "markdown-coil"]
+mlkit = ["mlkit-textRecognition-chinese", "mlkit-textRecognition-japanese", "mlkit-textRecognition-korean", "mlkit-textRecognition-latin", "mlkit-translate"]
 okhttp = ["okhttp-core", "okhttp-logging", "okhttp-brotli", "okhttp-dnsOverHttps", "okhttp-zstd"]
 serialization = ["kotlinx-serialization-json", "kotlinx-serialization-jsonOkio", "kotlinx-serialization-protobuf", "xmlutil-core", "xmlutil-serialization"]
 shizuku = ["shizuku-api", "shizuku-provider"]

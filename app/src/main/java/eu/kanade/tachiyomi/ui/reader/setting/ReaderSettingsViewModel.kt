@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
+import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.NavigationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
@@ -268,6 +270,26 @@ class ReaderSettingsViewModel(
         )
     }
 
+    /**
+     * Settings of the translation of pages, which every viewer but the WebGPU ones applies.
+     */
+    val translation = settings(
+        preferences.translatePages,
+        preferences.translateFrom,
+        preferences.translateTo,
+    ) {
+        TranslationSettings(
+            enabled = translatePages.get(),
+            from = translateFrom.get(),
+            to = translateTo.get(),
+        )
+    }
+
+    /**
+     * Translates pages for the viewers, kept here so its models stay loaded across viewers.
+     */
+    val pageTranslator = PageTranslator()
+
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 
     /**
@@ -327,6 +349,10 @@ class ReaderSettingsViewModel(
             .merge()
             .map { preferences.read() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, preferences.read())
+    }
+
+    override fun onCleared() {
+        pageTranslator.close()
     }
 
     private data class ViewerMode(

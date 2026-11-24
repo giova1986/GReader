@@ -146,8 +146,12 @@ class PagerPageHolder(
             val buffer = withContext(Dispatchers.IO) { streamFn().use { Buffer().readFrom(it) } }
             // Splitting, merging and sampling the background decode the image, which is CPU work
             val (source, isAnimated, background) = withContext(Dispatchers.Default) {
-                val source = viewer.simplePaged.processPagedImage(item, buffer, viewer is L2RPagerViewer) {
+                val processed = viewer.simplePaged.processPagedImage(item, buffer, viewer is L2RPagerViewer) {
                     viewer.onPageSplit(item, it)
+                }
+                // Translating waits on ML Kit's own threads
+                val source = withContext(Dispatchers.IO) {
+                    viewer.pageTranslator.translatePage(processed, viewer.translation)
                 }
                 val isAnimated = ImageUtil.isAnimatedAndSupported(source)
                 val background = if (!isAnimated && viewer.general.automaticBackground) {

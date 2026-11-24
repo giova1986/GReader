@@ -20,6 +20,8 @@ import eu.kanade.tachiyomi.ui.reader.model.ChapterTransition
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.setting.GeneralSettings
+import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LocalPageColorFilter
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
@@ -78,6 +80,12 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
      */
     val simpleLongStrip: SimpleLongStripSettings
         get() = settingsViewModel.simpleLongStrip.value
+
+    val translation: TranslationSettings
+        get() = settingsViewModel.translation.value
+
+    val pageTranslator: PageTranslator
+        get() = settingsViewModel.pageTranslator
 
     /**
      * Settings shared by every viewer, like allow taps or page transitions.
@@ -165,6 +173,11 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
             }
             if (old?.doubleTapZoom != new.doubleTapZoom) {
                 frame.doubleTapZoom = new.doubleTapZoom
+            }
+        }
+        settingsViewModel.translation.collectChanges(scope) { old, _ ->
+            if (old != null) {
+                refreshAdapter()
             }
         }
 

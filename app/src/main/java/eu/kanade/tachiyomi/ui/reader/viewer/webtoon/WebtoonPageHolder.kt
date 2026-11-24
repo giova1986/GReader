@@ -186,7 +186,11 @@ class WebtoonPageHolder(
             val buffer = withContext(Dispatchers.IO) { streamFn().use { Buffer().readFrom(it) } }
             // Splitting and merging decode the image, which is CPU work
             val (source, isAnimated) = withContext(Dispatchers.Default) {
-                val source = viewer.simpleLongStrip.page.processStripImage(buffer)
+                val processed = viewer.simpleLongStrip.page.processStripImage(buffer)
+                // Translating waits on ML Kit's own threads
+                val source = withContext(Dispatchers.IO) {
+                    viewer.pageTranslator.translatePage(processed, viewer.translation)
+                }
                 val isAnimated = ImageUtil.isAnimatedAndSupported(source)
                 Pair(source, isAnimated)
             }

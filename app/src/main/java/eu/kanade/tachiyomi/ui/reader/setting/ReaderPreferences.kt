@@ -6,6 +6,7 @@ import dev.icerock.moko.resources.StringResource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShader
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShaders
 import tachiyomi.core.common.preference.Preference
@@ -262,6 +263,20 @@ class ReaderPreferences(
         WebGpuShaders::serialize,
         WebGpuShaders::deserialize,
     )
+
+    // endregion
+
+    // region Translation
+
+    val translatePages: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_pages", false)
+
+    val translateFrom: Preference<TranslationSource> = preferenceStore.getEnum(
+        "pref_translate_from",
+        TranslationSource.JAPANESE,
+    )
+
+    /** An ML Kit translate language code. */
+    val translateTo: Preference<String> = preferenceStore.getString("pref_translate_to", "it")
 
     // endregion
 
