@@ -392,6 +392,7 @@
     <string name="download_insufficient_space">Impossibile scaricare i capitoli a causa dello spazio di archiviazione insufficiente</string>
     <string name="pref_category_reading_mode">Modalità di lettura</string>
     <string name="pref_category_translation">Traduzione</string>
+    <string name="pref_translation_summary">Lingua dei fumetti, traduttore, chiave Gemini</string>
     <string name="pref_translate_pages">Traduci le pagine</string>
     <string name="pref_translate_pages_summary">Il testo dei fumetti viene letto e tradotto su questo dispositivo. Ogni lingua viene scaricata una volta, poi la traduzione funziona offline.</string>
     <string name="pref_translate_from">Traduci da</string>

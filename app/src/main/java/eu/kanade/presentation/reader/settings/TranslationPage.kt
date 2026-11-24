@@ -99,7 +99,7 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
     )
 }
 
-private fun languageName(code: String): String {
+internal fun languageName(code: String): String {
     val locale = Locale.getDefault()
     return Locale.forLanguageTag(code).getDisplayName(locale).replaceFirstChar { it.titlecase(locale) }
 }
