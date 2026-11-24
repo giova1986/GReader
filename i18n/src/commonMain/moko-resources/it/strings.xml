@@ -396,6 +396,12 @@
     <string name="pref_translate_pages_summary">Il testo dei fumetti viene letto e tradotto su questo dispositivo. Ogni lingua viene scaricata una volta, poi la traduzione funziona offline.</string>
     <string name="pref_translate_from">Traduci da</string>
     <string name="pref_translate_to">Traduci in</string>
+    <string name="pref_translation_engine">Traduttore</string>
+    <string name="translation_engine_on_device">Sul dispositivo</string>
+    <string name="translation_engine_gemini">Gemini (online)</string>
+    <string name="pref_gemini_summary">Gemini legge ogni pagina con il contesto del capitolo letto finora. Ottieni una chiave API gratuita su aistudio.google.com. Le pagine vengono inviate a Google, che nel piano gratuito può usarle per migliorare i suoi prodotti. Se Gemini non risponde, ad esempio per quota gratuita esaurita, le pagine vengono tradotte sul dispositivo.</string>
+    <string name="pref_gemini_api_key">Chiave API di Gemini</string>
+    <string name="pref_gemini_model">Modello Gemini</string>
     <string name="pref_category_theme">Tema</string>
     <string name="action_sort_date_added">Data di aggiunta</string>
     <string name="channel_progress">Progresso</string>

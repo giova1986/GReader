@@ -189,7 +189,7 @@ class WebtoonPageHolder(
                 val processed = viewer.simpleLongStrip.page.processStripImage(buffer)
                 // Translating waits on ML Kit's own threads
                 val source = withContext(Dispatchers.IO) {
-                    viewer.pageTranslator.translatePage(processed, viewer.translation)
+                    viewer.pageTranslator.translatePage(processed, viewer.translation, page?.chapter?.chapter?.id)
                 }
                 val isAnimated = ImageUtil.isAnimatedAndSupported(source)
                 Pair(source, isAnimated)

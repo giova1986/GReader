@@ -12,116 +12,72 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.graphics.ColorUtils
-import com.google.android.gms.tasks.Tasks
-import com.google.mlkit.nl.translate.Translation
-import com.google.mlkit.nl.translate.Translator
-import com.google.mlkit.nl.translate.TranslatorOptions
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.TextRecognizer
 import logcat.LogPriority
+import okhttp3.OkHttpClient
 import okio.Buffer
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import java.io.Closeable
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Translates the text of pages on the device: ML Kit reads each block of text, usually a speech bubble, translates
- * it, and the translation is painted over the block on a copy of the image. Nothing leaves the device but the one
- * time download of each language's translation model.
- *
- * Blocking, so never call it on the main thread.
+ * Translates the text of pages with the engine the settings pick, painting each translation over its text on a
+ * copy of the image. Blocking, so never call it on the main thread.
  */
-class PageTranslator : Closeable {
+class PageTranslator(client: OkHttpClient) : Closeable {
 
-    private val recognizers = ConcurrentHashMap<TranslationSource, TextRecognizer>()
-    private val translators = ConcurrentHashMap<Pair<String, String>, Translator>()
+    private val mlKit = MlKitTextTranslator()
+    private val gemini = GeminiTextTranslator(client)
 
     /**
      * [image] translated when [settings] enable it, or [image] itself when it can't be: an animated image, or a
-     * failure such as the language model not downloading while offline, so the page still shows.
+     * failure such as the language model not downloading while offline, so the page still shows. A page of
+     * [chapterId] gets the chapter's earlier pages as context where the engine uses it.
      */
-    fun translatePage(image: BufferedSource, settings: TranslationSettings): BufferedSource {
+    fun translatePage(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
         if (!settings.enabled || ImageUtil.isAnimatedAndSupported(image)) return image
         return try {
-            translate(image, settings)
+            translate(image, settings, chapterId)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to translate page" }
             image
         }
     }
 
-    /**
-     * [image] with its text translated as [settings] say, or [image] itself when it has no text.
-     */
-    private fun translate(image: BufferedSource, settings: TranslationSettings): BufferedSource {
+    override fun close() {
+        mlKit.close()
+    }
+
+    private fun translate(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
         val options = BitmapFactory.Options().apply { inMutable = true }
         val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image
         try {
-            val regions = recognize(bitmap, settings.from)
-            if (regions.isEmpty()) return image
-
-            val translator = translators.getOrPut(settings.from.language to settings.to) {
-                Translation.getClient(
-                    TranslatorOptions.Builder()
-                        .setSourceLanguage(settings.from.language)
-                        .setTargetLanguage(settings.to)
-                        .build(),
-                )
+            val translations = when (settings.engine) {
+                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings)
+                TranslationEngine.GEMINI -> try {
+                    gemini.translate(bitmap, settings, chapterId)
+                } catch (e: Exception) {
+                    // Out of free quota or offline, the page is still worth translating on the device
+                    logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
+                    mlKit.translate(bitmap, settings)
+                }
             }
-            Tasks.await(translator.downloadModelIfNeeded())
+            if (translations.isEmpty()) return image
 
             // Sampled before painting, as a painted bubble may border the next one
-            val backgrounds = regions.map { backgroundOf(bitmap, it.bounds) }
+            val backgrounds = translations.map { backgroundOf(bitmap, it.bounds) }
             val canvas = Canvas(bitmap)
-            regions.forEachIndexed { index, region ->
-                val translated = Tasks.await(translator.translate(region.text)).trim()
-                if (translated.isNotEmpty()) {
-                    paint(canvas, region.bounds, backgrounds[index], translated)
-                }
+            translations.forEachIndexed { index, translation ->
+                paint(canvas, translation.bounds, backgrounds[index], translation.text)
             }
 
             return Buffer().also { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream()) }
         } finally {
             bitmap.recycle()
         }
-    }
-
-    override fun close() {
-        recognizers.values.forEach(TextRecognizer::close)
-        translators.values.forEach(Translator::close)
-    }
-
-    private fun recognize(bitmap: Bitmap, source: TranslationSource): List<TextRegion> {
-        val recognizer = recognizers.getOrPut(source) { TextRecognition.getClient(source.recognizerOptions()) }
-        // Long strips are read in parts, as the recognizer scales the whole image down to its input size
-        val tileHeight = max(bitmap.width * 2, MIN_TILE_HEIGHT)
-        val regions = mutableListOf<TextRegion>()
-        var top = 0
-        while (top < bitmap.height) {
-            val height = min(tileHeight, bitmap.height - top)
-            val tile = if (height == bitmap.height) {
-                bitmap
-            } else {
-                Bitmap.createBitmap(bitmap, 0, top, bitmap.width, height)
-            }
-            val text = Tasks.await(recognizer.process(InputImage.fromBitmap(tile, 0)))
-            if (tile !== bitmap) tile.recycle()
-
-            text.textBlocks.mapNotNullTo(regions) { block ->
-                val bounds = block.boundingBox ?: return@mapNotNullTo null
-                val content = block.lines.joinToString(source.lineSeparator) { it.text }
-                if (content.none(Char::isLetter)) return@mapNotNullTo null
-                TextRegion(Rect(bounds).apply { offset(0, top) }, content)
-            }
-            top += height
-        }
-        return regions
     }
 
     /**
@@ -206,11 +162,8 @@ class PageTranslator : Closeable {
             .build()
     }
 
-    private data class TextRegion(val bounds: Rect, val text: String)
-
     private companion object {
         const val JPEG_QUALITY = 95
-        const val MIN_TILE_HEIGHT = 2048
         const val MIN_TEXT_SIZE = 8f
         const val PADDING_RATIO = 0.1f
         const val MIN_WIDTH_TO_HEIGHT = 0.7f

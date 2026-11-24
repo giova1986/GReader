@@ -6,6 +6,7 @@ import dev.icerock.moko.resources.StringResource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShader
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShaders
@@ -277,6 +278,15 @@ class ReaderPreferences(
 
     /** An ML Kit translate language code. */
     val translateTo: Preference<String> = preferenceStore.getString("pref_translate_to", "it")
+
+    val translationEngine: Preference<TranslationEngine> = preferenceStore.getEnum(
+        "pref_translation_engine",
+        TranslationEngine.ML_KIT,
+    )
+
+    val geminiApiKey: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_gemini_api_key"))
+
+    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.5-flash-lite")
 
     // endregion
 

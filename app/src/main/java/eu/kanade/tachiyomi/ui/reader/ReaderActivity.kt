@@ -79,6 +79,7 @@ import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -139,9 +140,15 @@ class ReaderActivity : BaseActivity() {
 
     @Inject private lateinit var preferences: BasePreferences
 
+    @Inject private lateinit var networkHelper: NetworkHelper
+
     val viewModel by viewModels<ReaderViewModel> { graph.viewModelFactory }
     val settingsViewModel by viewModels<ReaderSettingsViewModel> {
-        viewModelFactory { initializer { ReaderSettingsViewModel(viewModel, readerPreferences, preferences) } }
+        viewModelFactory {
+            initializer {
+                ReaderSettingsViewModel(viewModel, readerPreferences, preferences, networkHelper.client)
+            }
+        }
     }
     private var assistUrl: String? = null
 

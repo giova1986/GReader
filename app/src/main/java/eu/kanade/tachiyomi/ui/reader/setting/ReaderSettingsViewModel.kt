@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
+import okhttp3.OkHttpClient
 import tachiyomi.core.common.preference.Preference
 import kotlin.time.Duration.Companion.seconds
 
@@ -42,6 +44,7 @@ class ReaderSettingsViewModel(
     private val readerViewModel: ReaderViewModel,
     val preferences: ReaderPreferences,
     private val basePreferences: BasePreferences,
+    client: OkHttpClient,
 ) : ViewModel() {
 
     val mangaFlow = readerViewModel.state
@@ -270,25 +273,36 @@ class ReaderSettingsViewModel(
         )
     }
 
-    /**
-     * Settings of the translation of pages, which every viewer but the WebGPU ones applies.
-     */
-    val translation = settings(
+    private val typedTranslation = settings(
         preferences.translatePages,
         preferences.translateFrom,
         preferences.translateTo,
+        preferences.translationEngine,
+        preferences.geminiApiKey,
+        preferences.geminiModel,
     ) {
         TranslationSettings(
             enabled = translatePages.get(),
+            engine = translationEngine.get(),
             from = translateFrom.get(),
             to = translateTo.get(),
+            geminiApiKey = geminiApiKey.get(),
+            geminiModel = geminiModel.get(),
         )
     }
 
     /**
+     * Settings of the translation of pages, which every viewer but the WebGPU ones applies.
+     */
+    val translation = typedTranslation
+        // The Gemini key and model are typed in, so pages aren't remade at every letter
+        .debounce(1.seconds)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, typedTranslation.value)
+
+    /**
      * Translates pages for the viewers, kept here so its models stay loaded across viewers.
      */
-    val pageTranslator = PageTranslator()
+    val pageTranslator = PageTranslator(client)
 
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 

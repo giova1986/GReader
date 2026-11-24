@@ -7,6 +7,9 @@ package eu.kanade.tachiyomi.ui.reader.translation
  */
 data class TranslationSettings(
     val enabled: Boolean,
+    val engine: TranslationEngine,
     val from: TranslationSource,
     val to: String,
+    val geminiApiKey: String,
+    val geminiModel: String,
 )
