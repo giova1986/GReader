@@ -93,6 +93,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationProblem
 import eu.kanade.tachiyomi.ui.reader.viewer.LocalPageColorFilter
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.Action
@@ -128,6 +129,9 @@ class ReaderActivity : BaseActivity() {
     private val graph: AppGraph by lazy { metroGraph() }
 
     companion object {
+        private const val TRANSLATION_SETTINGS_PAGE = 3
+        private const val TRANSLATION_PROBLEM_INTERVAL = 30_000L
+
         fun newIntent(context: Context, mangaId: Long?, chapterId: Long?): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra("manga", mangaId)
@@ -160,6 +164,7 @@ class ReaderActivity : BaseActivity() {
     private var assistUrl: String? = null
 
     private var menuToggleToast: Toast? = null
+    private var lastTranslationProblem: Pair<TranslationProblem, Long>? = null
     private var readingModeToast: Toast? = null
     private val displayRefreshHost by lazy { DisplayRefreshHost(readerPreferences) }
     private val navigationOverlayState = ReaderNavigationOverlayState()
@@ -301,6 +306,7 @@ class ReaderActivity : BaseActivity() {
                         onShowMenus = { setMenuVisibility(true) },
                         onHideMenus = { setMenuVisibility(false) },
                         viewModel = settingsViewModel,
+                        initialPage = (state.dialog as ReaderViewModel.Dialog.Settings).initialPage,
                     )
                 }
                 is ReaderViewModel.Dialog.ReadingModeSelect -> {
@@ -349,6 +355,10 @@ class ReaderActivity : BaseActivity() {
         )
 
         setMenuVisibility(viewModel.state.value.menuVisible)
+
+        settingsViewModel.pageTranslator.problems
+            .onEach(::showTranslationProblem)
+            .launchIn(lifecycleScope)
 
         // Finish when incognito mode is disabled
         preferences.incognitoMode.changes()
@@ -553,6 +563,22 @@ class ReaderActivity : BaseActivity() {
         }
     }
 
+    /**
+     * Tells the user why pages stay untranslated, once rather than for every page that fails the same way.
+     */
+    private fun showTranslationProblem(problem: TranslationProblem) {
+        val now = System.currentTimeMillis()
+        val (last, shownAt) = lastTranslationProblem ?: (null to 0L)
+        if (problem == last && now - shownAt < TRANSLATION_PROBLEM_INTERVAL) return
+        lastTranslationProblem = problem to now
+        val text = when (problem) {
+            is TranslationProblem.GeminiFailed -> stringResource(MR.strings.translation_gemini_failed, problem.reason)
+            is TranslationProblem.Failed -> stringResource(MR.strings.translation_failed, problem.reason)
+            TranslationProblem.NoText -> stringResource(MR.strings.translation_no_text)
+        }
+        toast(text, Toast.LENGTH_LONG)
+    }
+
     @Composable
     fun AppBars(state: ReaderViewModel.State) {
         val isHttpSource = state.source is HttpSource
@@ -562,6 +588,7 @@ class ReaderActivity : BaseActivity() {
         val cropBorderWebtoon by readerPreferences.cropBordersWebtoon.collectAsState()
         val isPagerType = ReadingMode.isPagerType(viewModel.getMangaReadingMode())
         val cropEnabled = if (isPagerType) cropBorderPaged else cropBorderWebtoon
+        val translationEnabled by readerPreferences.translatePages.collectAsState()
 
         val verticalNavigatorModes by readerPreferences.verticalNavigator.collectAsState()
         val verticalNavigator = verticalNavigatorModes.contains(readingMode)
@@ -623,7 +650,15 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast?.cancel()
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
-            onClickSettings = viewModel::openSettingsDialog,
+            translationEnabled = translationEnabled,
+            onClickTranslation = {
+                val enabled = !readerPreferences.translatePages.get()
+                readerPreferences.translatePages.set(enabled)
+                menuToggleToast?.cancel()
+                menuToggleToast = toast(if (enabled) MR.strings.translation_on else MR.strings.translation_off)
+            },
+            onLongClickTranslation = { viewModel.openSettingsDialog(TRANSLATION_SETTINGS_PAGE) },
+            onClickSettings = { viewModel.openSettingsDialog() },
         )
     }
 

@@ -924,8 +924,8 @@ class ReaderViewModel(
         mutableState.update { it.copy(dialog = Dialog.PageActions(page)) }
     }
 
-    fun openSettingsDialog() {
-        mutableState.update { it.copy(dialog = Dialog.Settings) }
+    fun openSettingsDialog(initialPage: Int = 0) {
+        mutableState.update { it.copy(dialog = Dialog.Settings(initialPage)) }
     }
 
     fun closeDialog() {
@@ -1105,7 +1105,7 @@ class ReaderViewModel(
     }
 
     sealed interface Dialog {
-        data object Settings : Dialog
+        data class Settings(val initialPage: Int) : Dialog
         data object ReadingModeSelect : Dialog
         data object OrientationModeSelect : Dialog
         data class PageActions(val page: ReaderPage) : Dialog

@@ -288,7 +288,7 @@ class ReaderPreferences(
 
     val geminiApiKey: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_gemini_api_key"))
 
-    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.5-flash-lite")
+    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.1-flash-lite")
 
     // endregion
 

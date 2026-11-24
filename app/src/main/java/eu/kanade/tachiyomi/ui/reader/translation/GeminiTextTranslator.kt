@@ -10,6 +10,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -93,12 +95,24 @@ class GeminiTextTranslator(
             .build()
         val result = client.newCall(request).execute().use { response ->
             val text = response.body.string()
-            if (!response.isSuccessful) throw IOException("Gemini answered ${response.code}: $text")
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${errorMessage(text)}")
             json.decodeFromString<GenerateContentResponse>(text)
         }
         val answer = result.candidates.firstOrNull()?.content?.parts?.joinToString("") { it.text.orEmpty() }
             ?: return emptyList()
         return json.decodeFromString<List<Bubble>>(answer)
+    }
+
+    /**
+     * The message of a Gemini error body, such as a model that doesn't exist or a used up free quota.
+     */
+    private fun errorMessage(body: String): String {
+        val message = try {
+            json.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+        } catch (_: Exception) {
+            null
+        }
+        return (message ?: body).take(MAX_ERROR_LENGTH)
     }
 
     private fun prompt(settings: TranslationSettings, context: String): String {
@@ -154,6 +168,7 @@ class GeminiTextTranslator(
     )
 
     private companion object {
+        const val MAX_ERROR_LENGTH = 160
         const val API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         const val BOX_SCALE = 1000
         const val MAX_UPLOAD_SIZE = 1536

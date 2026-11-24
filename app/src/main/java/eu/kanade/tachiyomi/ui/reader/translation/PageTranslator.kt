@@ -18,6 +18,9 @@ import okio.Buffer
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import java.io.Closeable
 import java.io.File
 import kotlin.math.max
@@ -34,6 +37,12 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
     private val gemini = GeminiTextTranslator(client)
     private val detector = BubbleDetector(client, modelDirectory)
 
+    private val mutableProblems = MutableSharedFlow<TranslationProblem>(
+        extraBufferCapacity = 4,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val problems: SharedFlow<TranslationProblem> = mutableProblems
+
     /**
      * [image] translated when [settings] enable it, or [image] itself when it can't be: an animated image, or a
      * failure such as the language model not downloading while offline, so the page still shows. A page of
@@ -45,6 +54,7 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
             translate(image, settings, chapterId)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to translate page" }
+            mutableProblems.tryEmit(TranslationProblem.Failed(e.message ?: e.javaClass.simpleName))
             image
         }
     }
@@ -65,10 +75,14 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
                 } catch (e: Exception) {
                     // Out of free quota or offline, the page is still worth translating on the device
                     logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
+                    mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
                     mlKit.translate(bitmap, settings, regions(bitmap, settings))
                 }
             }
-            if (translations.isEmpty()) return image
+            if (translations.isEmpty()) {
+                mutableProblems.tryEmit(TranslationProblem.NoText)
+                return image
+            }
 
             // Sampled before painting, as a painted bubble may border the next one
             val backgrounds = translations.map { backgroundOf(bitmap, it.bounds) }
