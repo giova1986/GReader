@@ -55,6 +55,11 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
     )
 
     CheckboxItem(
+        label = stringResource(MR.strings.pref_translate_downloads),
+        pref = viewModel.preferences.translateDownloads,
+    )
+
+    CheckboxItem(
         label = stringResource(MR.strings.pref_detect_bubbles),
         pref = viewModel.preferences.detectBubbles,
     )

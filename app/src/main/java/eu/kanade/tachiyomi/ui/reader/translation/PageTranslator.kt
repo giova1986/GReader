@@ -12,15 +12,18 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.graphics.ColorUtils
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import logcat.LogPriority
 import okhttp3.OkHttpClient
 import okio.Buffer
 import okio.BufferedSource
+import okio.buffer
+import okio.sink
+import okio.source
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import java.io.Closeable
 import java.io.File
 import kotlin.math.max
@@ -29,13 +32,15 @@ import kotlin.math.roundToInt
 
 /**
  * Translates the text of pages with the engine the settings pick, painting each translation over its text on a
- * copy of the image. Blocking, so never call it on the main thread.
+ * copy of the image, and keeps translated pages in [directory] so a page is translated once, ahead of reading for
+ * downloaded chapters. Blocking, so never call it on the main thread.
  */
-class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
+class PageTranslator(client: OkHttpClient, private val directory: File) : Closeable {
 
     private val mlKit = MlKitTextTranslator()
     private val gemini = GeminiTextTranslator(client)
-    private val detector = BubbleDetector(client, modelDirectory)
+    private val detector = BubbleDetector(client, directory)
+    private val pages = File(directory, "pages")
 
     private val mutableProblems = MutableSharedFlow<TranslationProblem>(
         extraBufferCapacity = 4,
@@ -50,8 +55,15 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
      */
     fun translatePage(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
         if (!settings.enabled || ImageUtil.isAnimatedAndSupported(image)) return image
+        val saved = File(pages, "${image.peek().readByteString().sha256().hex()}-${settings.pageKey()}.jpg")
+        if (saved.exists()) {
+            saved.setLastModified(System.currentTimeMillis())
+            return Buffer().apply { saved.source().use { writeAll(it) } }
+        }
         return try {
-            translate(image, settings, chapterId)
+            val (translated, complete) = translate(image, settings, chapterId)
+            if (complete) save(translated, saved)
+            translated
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to translate page" }
             mutableProblems.tryEmit(TranslationProblem.Failed(e.message ?: e.javaClass.simpleName))
@@ -64,10 +76,19 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
         detector.close()
     }
 
-    private fun translate(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
+    /**
+     * [image] translated, and whether it was translated as [settings] ask, rather than on the device after Gemini
+     * failed, so a page is only kept when asking again wouldn't do better.
+     */
+    private fun translate(
+        image: BufferedSource,
+        settings: TranslationSettings,
+        chapterId: Long?,
+    ): Pair<BufferedSource, Boolean> {
         val options = BitmapFactory.Options().apply { inMutable = true }
-        val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image
+        val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image to false
         try {
+            var complete = true
             val translations = when (settings.engine) {
                 TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions(bitmap, settings))
                 TranslationEngine.GEMINI -> try {
@@ -76,12 +97,13 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
                     // Out of free quota or offline, the page is still worth translating on the device
                     logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
                     mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
+                    complete = false
                     mlKit.translate(bitmap, settings, regions(bitmap, settings))
                 }
             }
             if (translations.isEmpty()) {
                 mutableProblems.tryEmit(TranslationProblem.NoText)
-                return image
+                return image to false
             }
 
             // Sampled before painting, as a painted bubble may border the next one
@@ -91,10 +113,41 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
                 paint(canvas, translation.bounds, backgrounds[index], translation.text)
             }
 
-            return Buffer().also { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream()) }
+            val translated = Buffer().also {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream())
+            }
+            return translated to complete
         } finally {
             bitmap.recycle()
         }
+    }
+
+    /**
+     * Keeps [page] as [file], then drops the pages read longest ago once they take more than [MAX_SAVED_BYTES].
+     */
+    private fun save(page: BufferedSource, file: File) {
+        pages.mkdirs()
+        val partial = File(pages, "${file.name}.part")
+        partial.sink().buffer().use { it.writeAll(page.peek()) }
+        partial.renameTo(file)
+
+        val saved = pages.listFiles().orEmpty().sortedByDescending(File::lastModified)
+        var total = 0L
+        saved.forEach {
+            total += it.length()
+            if (total > MAX_SAVED_BYTES) it.delete()
+        }
+    }
+
+    /**
+     * What a translated page depends on besides the image, so changing any of it translates pages again.
+     */
+    private fun TranslationSettings.pageKey(): String {
+        val engineKey = when (engine) {
+            TranslationEngine.ML_KIT -> "mlkit-$detectBubbles"
+            TranslationEngine.GEMINI -> "gemini-${geminiModel.trim()}"
+        }
+        return "${from.name}-$to-$engineKey".replace(Regex("[^A-Za-z0-9._-]"), "_")
     }
 
     /**
@@ -195,6 +248,7 @@ class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
 
     private companion object {
         const val JPEG_QUALITY = 95
+        const val MAX_SAVED_BYTES = 500L * 1024 * 1024
         const val MIN_TEXT_SIZE = 8f
         const val PADDING_RATIO = 0.1f
         const val MIN_WIDTH_TO_HEIGHT = 0.7f

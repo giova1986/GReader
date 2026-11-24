@@ -395,6 +395,8 @@
     <string name="pref_translation_summary">Lingua dei fumetti, traduttore, chiave Gemini</string>
     <string name="pref_translate_pages">Traduci le pagine</string>
     <string name="pref_translate_pages_summary">Il testo dei fumetti viene letto e tradotto su questo dispositivo. Ogni lingua viene scaricata una volta, poi la traduzione funziona offline.</string>
+    <string name="pref_translate_downloads">Traduci i capitoli scaricati</string>
+    <string name="pref_translate_downloads_summary">Ogni capitolo viene tradotto appena scaricato, così le pagine sono pronte quando le leggi. Le pagine tradotte vengono conservate, fino a 500 MB.</string>
     <string name="pref_detect_bubbles">Riconosci i fumetti</string>
     <string name="pref_detect_bubbles_summary">Legge insieme tutto il testo di ogni fumetto prima di tradurlo, con un modello che funziona su questo dispositivo. Si scarica una volta, circa 11 MB.</string>
     <string name="translation_on">Traduzione attiva</string>

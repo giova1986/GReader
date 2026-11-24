@@ -11,9 +11,12 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.data.library.LibraryUpdateNotifier
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.network.HttpException
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.UnmeteredSource
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.DiskUtil.NOMEDIA_FILE
 import eu.kanade.tachiyomi.util.storage.saveTo
@@ -26,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -52,6 +56,8 @@ import mihon.core.metro.AppCoroutineScope
 import mihon.data.cache.ChapterCache
 import nl.adaptivity.xmlutil.serialization.XML
 import okhttp3.Response
+import okio.Buffer
+import okio.source
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
@@ -64,6 +70,7 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.domain.track.interactor.GetTracks
 import tachiyomi.i18n.MR
+import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
@@ -88,6 +95,8 @@ class Downloader(
     private val getTracks: GetTracks,
     private val store: DownloadStore,
     private val notifier: DownloadNotifier,
+    private val readerPreferences: ReaderPreferences,
+    private val networkHelper: NetworkHelper,
 ) {
     /**
      * Queue where active downloads are kept.
@@ -402,6 +411,28 @@ class Downloader(
     }
 
     /**
+     * Translates the pages of [download] in [tmpDir] in order, when the user reads translated and wants downloads
+     * translated, so the reader finds them ready and Gemini has the whole chapter so far as context. A page that
+     * fails is left for the reader to translate.
+     */
+    private suspend fun translateChapter(download: Download, tmpDir: UniFile) {
+        val settings = readerPreferences.translationSettings()
+        if (!settings.enabled || !readerPreferences.translateDownloads.get()) return
+        val pages = tmpDir.listFiles().orEmpty()
+            .filter { file -> file.isFile && ImageUtil.isImage(file.name) { file.openInputStream() } }
+            .sortedBy { it.name }
+        withContext(Dispatchers.IO) {
+            PageTranslator(networkHelper.client, File(context.filesDir, "translation")).use { translator ->
+                pages.forEach { page ->
+                    ensureActive()
+                    val image = Buffer().apply { page.openInputStream().source().use { writeAll(it) } }
+                    translator.translatePage(image, settings, download.chapter.id)
+                }
+            }
+        }
+    }
+
+    /**
      * Downloads a chapter.
      *
      * @param download the chapter to be downloaded.
@@ -490,6 +521,8 @@ class Downloader(
                 download.status = Download.State.ERROR
                 return
             }
+
+            translateChapter(download, tmpDir)
 
             createComicInfoFile(
                 tmpDir,

@@ -53,6 +53,11 @@ data object SettingsTranslationScreen : SearchableSettings {
                 title = stringResource(MR.strings.pref_translate_to),
             ),
             Preference.PreferenceItem.SwitchPreference(
+                preference = readerPref.translateDownloads,
+                title = stringResource(MR.strings.pref_translate_downloads),
+                subtitle = stringResource(MR.strings.pref_translate_downloads_summary),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
                 preference = readerPref.detectBubbles,
                 title = stringResource(MR.strings.pref_detect_bubbles),
                 subtitle = stringResource(MR.strings.pref_detect_bubbles_summary),

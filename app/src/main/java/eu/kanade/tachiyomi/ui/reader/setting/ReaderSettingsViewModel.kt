@@ -6,7 +6,6 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
 import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
-import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.NavigationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
@@ -284,15 +283,7 @@ class ReaderSettingsViewModel(
         preferences.geminiApiKey,
         preferences.geminiModel,
     ) {
-        TranslationSettings(
-            enabled = translatePages.get(),
-            engine = translationEngine.get(),
-            from = translateFrom.get(),
-            to = translateTo.get(),
-            detectBubbles = detectBubbles.get(),
-            geminiApiKey = geminiApiKey.get(),
-            geminiModel = geminiModel.get(),
-        )
+        translationSettings()
     }
 
     /**
