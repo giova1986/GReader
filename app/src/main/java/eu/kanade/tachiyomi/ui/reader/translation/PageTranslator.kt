@@ -19,6 +19,7 @@ import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import java.io.Closeable
+import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -27,10 +28,11 @@ import kotlin.math.roundToInt
  * Translates the text of pages with the engine the settings pick, painting each translation over its text on a
  * copy of the image. Blocking, so never call it on the main thread.
  */
-class PageTranslator(client: OkHttpClient) : Closeable {
+class PageTranslator(client: OkHttpClient, modelDirectory: File) : Closeable {
 
     private val mlKit = MlKitTextTranslator()
     private val gemini = GeminiTextTranslator(client)
+    private val detector = BubbleDetector(client, modelDirectory)
 
     /**
      * [image] translated when [settings] enable it, or [image] itself when it can't be: an animated image, or a
@@ -49,6 +51,7 @@ class PageTranslator(client: OkHttpClient) : Closeable {
 
     override fun close() {
         mlKit.close()
+        detector.close()
     }
 
     private fun translate(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
@@ -56,13 +59,13 @@ class PageTranslator(client: OkHttpClient) : Closeable {
         val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image
         try {
             val translations = when (settings.engine) {
-                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings)
+                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions(bitmap, settings))
                 TranslationEngine.GEMINI -> try {
                     gemini.translate(bitmap, settings, chapterId)
                 } catch (e: Exception) {
                     // Out of free quota or offline, the page is still worth translating on the device
                     logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
-                    mlKit.translate(bitmap, settings)
+                    mlKit.translate(bitmap, settings, regions(bitmap, settings))
                 }
             }
             if (translations.isEmpty()) return image
@@ -77,6 +80,20 @@ class PageTranslator(client: OkHttpClient) : Closeable {
             return Buffer().also { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream()) }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    /**
+     * The bubbles of [bitmap] when [settings] detect them, or none when the detector can't run, such as before its
+     * first download while offline, leaving ML Kit's own grouping of the text.
+     */
+    private fun regions(bitmap: Bitmap, settings: TranslationSettings): List<TextRegion> {
+        if (!settings.detectBubbles) return emptyList()
+        return try {
+            detector.detect(bitmap)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Bubble detection failed" }
+            emptyList()
         }
     }
 

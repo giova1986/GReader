@@ -49,6 +49,11 @@ data object SettingsTranslationScreen : SearchableSettings {
                 entries = targets,
                 title = stringResource(MR.strings.pref_translate_to),
             ),
+            Preference.PreferenceItem.SwitchPreference(
+                preference = readerPref.detectBubbles,
+                title = stringResource(MR.strings.pref_detect_bubbles),
+                subtitle = stringResource(MR.strings.pref_detect_bubbles_summary),
+            ),
             Preference.PreferenceItem.ListPreference(
                 preference = readerPref.translationEngine,
                 entries = TranslationEngine.entries.associateWith { stringResource(it.titleRes) },

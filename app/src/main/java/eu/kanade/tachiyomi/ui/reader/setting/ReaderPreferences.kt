@@ -279,6 +279,8 @@ class ReaderPreferences(
     /** An ML Kit translate language code. */
     val translateTo: Preference<String> = preferenceStore.getString("pref_translate_to", "it")
 
+    val detectBubbles: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_detect_bubbles", true)
+
     val translationEngine: Preference<TranslationEngine> = preferenceStore.getEnum(
         "pref_translation_engine",
         TranslationEngine.ML_KIT,

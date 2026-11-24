@@ -44,6 +44,21 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
         ),
     )
 
+    CheckboxItem(
+        label = stringResource(MR.strings.pref_detect_bubbles),
+        pref = viewModel.preferences.detectBubbles,
+    )
+
+    Text(
+        text = stringResource(MR.strings.pref_detect_bubbles_summary),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsItemsPaddings.Horizontal,
+            vertical = SettingsItemsPaddings.Vertical,
+        ),
+    )
+
     SettingsChipRow(MR.strings.pref_translation_engine) {
         TranslationEngine.entries.forEach {
             FilterChip(

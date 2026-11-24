@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import okhttp3.OkHttpClient
 import tachiyomi.core.common.preference.Preference
+import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -45,6 +46,7 @@ class ReaderSettingsViewModel(
     val preferences: ReaderPreferences,
     private val basePreferences: BasePreferences,
     client: OkHttpClient,
+    modelDirectory: File,
 ) : ViewModel() {
 
     val mangaFlow = readerViewModel.state
@@ -277,6 +279,7 @@ class ReaderSettingsViewModel(
         preferences.translatePages,
         preferences.translateFrom,
         preferences.translateTo,
+        preferences.detectBubbles,
         preferences.translationEngine,
         preferences.geminiApiKey,
         preferences.geminiModel,
@@ -286,6 +289,7 @@ class ReaderSettingsViewModel(
             engine = translationEngine.get(),
             from = translateFrom.get(),
             to = translateTo.get(),
+            detectBubbles = detectBubbles.get(),
             geminiApiKey = geminiApiKey.get(),
             geminiModel = geminiModel.get(),
         )
@@ -302,7 +306,7 @@ class ReaderSettingsViewModel(
     /**
      * Translates pages for the viewers, kept here so its models stay loaded across viewers.
      */
-    val pageTranslator = PageTranslator(client)
+    val pageTranslator = PageTranslator(client, modelDirectory)
 
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 

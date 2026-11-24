@@ -512,6 +512,8 @@
     <string name="pref_translation_summary">Speech bubble language, translator, Gemini key</string>
     <string name="pref_translate_pages">Translate pages</string>
     <string name="pref_translate_pages_summary">The text of speech bubbles is read and translated on this device. Each language is downloaded once, then translation works offline.</string>
+    <string name="pref_detect_bubbles">Detect speech bubbles</string>
+    <string name="pref_detect_bubbles_summary">Reads the text of each speech bubble together before translating it, with a model that runs on this device. It downloads once, about 11 MB.</string>
     <string name="pref_translate_from">Translate from</string>
     <string name="pref_translate_to">Translate to</string>
     <string name="pref_translation_engine">Translator</string>

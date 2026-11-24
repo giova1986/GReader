@@ -313,6 +313,7 @@ dependencies {
 
     // On-device OCR and translation of pages
     implementation(libs.bundles.mlkit)
+    implementation(libs.onnxruntime.android)
 
     // Logging
     implementation(libs.logcat)
