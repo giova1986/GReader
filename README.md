@@ -1,86 +1,73 @@
 <div align="center">
 
-<a href="https://mihon.app">
-    <img src="./.github/assets/logo.png" alt="Mihon logo" title="Mihon logo" width="80"/>
-</a>
+<img src="./.github/assets/honyaku-logo.png" alt="Logo di Honyaku" title="Honyaku" width="96"/>
 
-# Mihon [App](#)
+# Honyaku
 
-### Full-featured reader
-Discover and read manga, webtoons, comics, and more – easier than ever on your Android device.
+### Leggi manga, manhwa e manhua tradotti in automatico
 
-[![Discord server](https://img.shields.io/discord/1195734228319617024.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/mihon)
-[![GitHub downloads](https://img.shields.io/github/downloads/mihonapp/mihon/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://mihon.app/download)
+Un lettore di fumetti per Android basato su [Mihon](https://github.com/mihonapp/mihon) che traduce il testo dei balloon direttamente sulla pagina, sul telefono o con Gemini.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/mihonapp/mihon/build.yml?labelColor=27303D)](https://github.com/mihonapp/mihon/actions/workflows/build_push.yml)
-[![License: Apache-2.0](https://img.shields.io/github/license/mihonapp/mihon?labelColor=27303D&color=0877d2)](/LICENSE)
-[![Translation status](https://img.shields.io/weblate/progress/mihon?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/mihon/)
+[![Licenza: Apache-2.0](https://img.shields.io/badge/licenza-Apache--2.0-0877d2?labelColor=27303D)](/LICENSE)
+
+</div>
+
+## Obiettivo
+
+Molti fumetti escono solo in giapponese, coreano o cinese. Honyaku li rende leggibili subito: apri un capitolo e il testo di ogni balloon viene riconosciuto, tradotto e scritto al suo posto, nella lingua che scegli (l'italiano di partenza).
+
+La traduzione può avvenire **tutta sul telefono**, senza account e senza mandare le pagine a nessuno, oppure con **Gemini** di Google, che capisce il contesto del capitolo e traduce in modo più naturale. Tutto il resto è Mihon: libreria, estensioni, download, tracker e backup.
+
+Honyaku si installa accanto a Mihon senza sostituirlo.
+
+## Funzioni
+
+* **Traduzione sul dispositivo**: il testo viene letto con ML Kit (giapponese, coreano, cinese, alfabeto latino) e tradotto offline. Ogni lingua si scarica una volta.
+* **Riconoscimento dei balloon**: un modello sul telefono ([comic-text-and-bubble-detector](https://huggingface.co/ogkalu/comic-text-and-bubble-detector), Apache 2.0) trova ogni balloon, così il suo testo viene tradotto tutto insieme e la traduzione lo riempie.
+* **Gemini (facoltativo)**: legge la pagina con il contesto del capitolo letto finora, per mantenere nomi e tono. Usa la tua chiave gratuita di Google AI Studio e puoi scegliere il modello da un elenco. Se Gemini non risponde, la pagina viene tradotta sul telefono.
+* **Capitoli tradotti in anticipo**: un capitolo scaricato viene tradotto subito, così le pagine sono pronte quando lo leggi. Le pagine tradotte restano salvate (fino a 500 MB).
+* **Avvisi chiari**: se una pagina non si traduce, l'app dice perché (chiave sbagliata, quota esaurita, nessun testo trovato).
+* **Accesso rapido**: un pulsante nel menu del lettore accende e spegne la traduzione; una pressione lunga apre le sue impostazioni.
+
+## Come attivare la traduzione
+
+1. Apri un capitolo e tocca il centro della pagina per far comparire i menu.
+2. Tocca il **mappamondo** nella barra in basso per accendere la traduzione. Tienilo premuto per aprire le impostazioni (le stesse sono anche in *Altro › Impostazioni › Traduzione*).
+3. In **Traduci da** scegli la lingua del fumetto e in **Traduci in** la tua.
+4. In **Traduttore** lascia *Sul dispositivo*, oppure scegli *Gemini (online)*:
+   1. su [aistudio.google.com](https://aistudio.google.com) crea una chiave API gratuita;
+   2. incollala in **Chiave API di Gemini**;
+   3. scegli il modello dall'elenco.
+
+La prima volta servono internet e qualche secondo per scaricare la lingua e il modello dei balloon; dopo, la traduzione sul dispositivo funziona offline.
+
+> Con Gemini le pagine vengono inviate a Google, che nel piano gratuito può usarle per migliorare i suoi prodotti.
 
 ## Download
 
-[![Mihon Stable](https://img.shields.io/github/release/mihonapp/mihon.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://mihon.app/download)
-[![Mihon Beta](https://img.shields.io/github/v/release/mihonapp/mihon-preview.svg?maxAge=3600&label=Beta&labelColor=2c2c47&color=1c1c39)](https://mihon.app/download)
+L'APK viene compilato da GitHub Actions a ogni modifica: apri l'ultima esecuzione riuscita in [Actions](../../actions) e scarica **Honyaku.apk** (serve aver fatto l'accesso a GitHub).
 
-*Requires Android 8.0 or higher.*
+*Richiede Android 8.0 o successivo.*
 
-## Features
+## Licenza
 
-<div align="left">
+Honyaku è un fork di [Mihon](https://github.com/mihonapp/mihon), distribuito come Mihon sotto licenza [Apache 2.0](/LICENSE).
 
-* Local reading of content.
-* A configurable reader with multiple viewers, reading directions and other settings.
-* Tracker support: [MangaBaka](https://mangabaka.org), [MyAnimeList](https://myanimelist.net/), [AniList](https://anilist.co/), [Kitsu](https://kitsu.app/), [MangaUpdates](https://mangaupdates.com), [Shikimori](https://shikimori.one), [Bangumi](https://bgm.tv/), and [Hikka](https://hikka.io/) support.
-* Categories to organize your library.
-* Light and dark themes.
-* Schedule updating your library for new chapters.
-* Create backups locally to read offline or to your desired cloud service.
-* Plus much more...
+    Copyright © 2015 Javier Tomás
+    Copyright © 2024 Mihon Open Source Project
 
-</div>
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
-## Contributing
+    http://www.apache.org/licenses/LICENSE-2.0
 
-[Code of conduct](./CODE_OF_CONDUCT.md) · [Contributing guide](./CONTRIBUTING.md)
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## Disclaimer
 
-Before reporting a new issue, take a look at the [FAQ](https://mihon.app/docs/faq/general), the [changelog](https://mihon.app/changelogs/) and the already opened [issues](https://github.com/mihonapp/mihon/issues); if you got any questions, join our [Discord server](https://discord.gg/mihon).
-
-
-### Repositories
-
-[![mihonapp/website - GitHub](https://github-stats-extended.vercel.app/api/pin/?username=mihonapp&repo=website&bg_color=161B22&text_color=c9d1d9&title_color=0877d2&icon_color=0877d2&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/mihonapp/website/)
-[![mihonapp/bitmap.kt - GitHub](https://github-stats-extended.vercel.app/api/pin/?username=mihonapp&repo=bitmap.kt&bg_color=161B22&text_color=c9d1d9&title_color=0877d2&icon_color=0877d2&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/mihonapp/bitmap.kt/)
-
-### Credits
-
-Thank you to all the people who have contributed!
-
-<a href="https://github.com/mihonapp/mihon/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=mihonapp/mihon" alt="Mihon app contributors" title="Mihon app contributors" width="800"/>
-</a>
-
-### Disclaimer
-
-The developer(s) of this application does not have any affiliation with the content providers available, and this application hosts zero content.
-
-### License
-
-<pre>
-Copyright © 2015 Javier Tomás
-Copyright © 2024 Mihon Open Source Project
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-</pre>
-
-</div>
+Gli sviluppatori di questa applicazione non sono affiliati ai fornitori di contenuti disponibili e questa applicazione non ospita né distribuisce alcun contenuto.
