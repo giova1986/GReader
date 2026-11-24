@@ -82,6 +82,15 @@ class GeminiTextTranslator(
                     }
                 }
             }
+            // Fights and romance trip the default filters, which then answer with nothing
+            putJsonArray("safetySettings") {
+                SAFETY_CATEGORIES.forEach { category ->
+                    addJsonObject {
+                        put("category", category)
+                        put("threshold", "BLOCK_NONE")
+                    }
+                }
+            }
             putJsonObject("generationConfig") {
                 put("responseMimeType", "application/json")
                 put("responseSchema", RESPONSE_SCHEMA)
@@ -98,8 +107,15 @@ class GeminiTextTranslator(
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${errorMessage(text)}")
             json.decodeFromString<GenerateContentResponse>(text)
         }
-        val answer = result.candidates.firstOrNull()?.content?.parts?.joinToString("") { it.text.orEmpty() }
-            ?: return emptyList()
+        result.promptFeedback?.blockReason?.let { throw IOException("Blocked: $it") }
+        val candidate = result.candidates.firstOrNull() ?: return emptyList()
+        val answer = candidate.content?.parts?.joinToString("") { it.text.orEmpty() }
+        if (answer.isNullOrBlank()) {
+            if (candidate.finishReason != null && candidate.finishReason != "STOP") {
+                throw IOException("Stopped: ${candidate.finishReason}")
+            }
+            return emptyList()
+        }
         return json.decodeFromString<List<Bubble>>(answer)
     }
 
@@ -121,7 +137,7 @@ class GeminiTextTranslator(
         return buildString {
             append("This is a page of a manga or comic, mostly written in $from. ")
             append("Find every speech bubble, thought bubble, caption and narration box that holds text, ")
-            append("leaving out sound effects drawn into the art. ")
+            append("leaving out sound effects drawn into the art, watermarks, site names and scanlator credits. ")
             append("For each, give box_2d as [ymin, xmin, ymax, xmax] scaled to 0-1000, tightly around its text, ")
             append("the original text, and a natural $to translation that reads like a professional ")
             append("localization: keep character names, honorifics and tone consistent with the story so far. ")
@@ -149,10 +165,16 @@ class GeminiTextTranslator(
     }
 
     @Serializable
-    private data class GenerateContentResponse(val candidates: List<Candidate> = emptyList())
+    private data class GenerateContentResponse(
+        val candidates: List<Candidate> = emptyList(),
+        val promptFeedback: PromptFeedback? = null,
+    )
 
     @Serializable
-    private data class Candidate(val content: Content? = null)
+    private data class PromptFeedback(val blockReason: String? = null)
+
+    @Serializable
+    private data class Candidate(val content: Content? = null, val finishReason: String? = null)
 
     @Serializable
     private data class Content(val parts: List<Part> = emptyList())
@@ -169,6 +191,12 @@ class GeminiTextTranslator(
 
     private companion object {
         const val MAX_ERROR_LENGTH = 160
+        val SAFETY_CATEGORIES = listOf(
+            "HARM_CATEGORY_HARASSMENT",
+            "HARM_CATEGORY_HATE_SPEECH",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "HARM_CATEGORY_DANGEROUS_CONTENT",
+        )
         const val API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         const val BOX_SCALE = 1000
         const val MAX_UPLOAD_SIZE = 1536

@@ -7,12 +7,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.google.mlkit.nl.translate.TranslateLanguage
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
+import eu.kanade.tachiyomi.ui.reader.translation.fetchGeminiModels
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import logcat.LogPriority
+import mihon.app.di.appGraph
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.SelectItem
@@ -22,6 +31,7 @@ import tachiyomi.presentation.core.components.TextItem
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 import java.util.Locale
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
@@ -86,11 +96,22 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
             value = apiKey,
             onChange = viewModel.preferences.geminiApiKey::set,
         )
-        TextItem(
-            label = stringResource(MR.strings.pref_gemini_model),
-            value = model,
-            onChange = viewModel.preferences.geminiModel::set,
-        )
+        val models = rememberGeminiModels(apiKey)
+        if (models.isNullOrEmpty()) {
+            TextItem(
+                label = stringResource(MR.strings.pref_gemini_model),
+                value = model,
+                onChange = viewModel.preferences.geminiModel::set,
+            )
+        } else {
+            val options = if (model in models) models else listOf(model) + models
+            SelectItem(
+                label = stringResource(MR.strings.pref_gemini_model),
+                options = options.toTypedArray(),
+                selectedIndex = options.indexOf(model),
+                onSelect = { viewModel.preferences.geminiModel.set(options[it]) },
+            )
+        }
     }
 
     SettingsChipRow(MR.strings.pref_translate_from) {
@@ -118,3 +139,30 @@ internal fun languageName(code: String): String {
     val locale = Locale.getDefault()
     return Locale.forLanguageTag(code).getDisplayName(locale).replaceFirstChar { it.titlecase(locale) }
 }
+
+/**
+ * The Gemini models [apiKey] can use, or null while they load or when they can't be listed, such as without a key or
+ * while offline, leaving the model to be typed in.
+ */
+@Composable
+internal fun rememberGeminiModels(apiKey: String): List<String>? {
+    val context = LocalContext.current
+    val models by produceState<List<String>?>(null, apiKey) {
+        value = null
+        if (apiKey.isBlank()) return@produceState
+        // The key is typed in, so it isn't sent at every letter
+        delay(KEY_TYPING_DELAY)
+        value = withContext(Dispatchers.IO) {
+            try {
+                fetchGeminiModels(context.appGraph.networkHelper.client, apiKey)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Could not list Gemini models" }
+                null
+            }
+        }
+    }
+    return models
+}
+
+private val KEY_TYPING_DELAY = 1.seconds
+

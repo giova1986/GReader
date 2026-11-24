@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.google.mlkit.nl.translate.TranslateLanguage
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.reader.settings.languageName
+import eu.kanade.presentation.reader.settings.rememberGeminiModels
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import kotlinx.serialization.Serializable
@@ -29,6 +30,8 @@ data object SettingsTranslationScreen : SearchableSettings {
         val readerPref = remember { context.appGraph.readerPreferences }
         val engine by readerPref.translationEngine.collectAsState()
         val apiKey by readerPref.geminiApiKey.collectAsState()
+        val model by readerPref.geminiModel.collectAsState()
+        val models = rememberGeminiModels(apiKey)
         val targets = remember {
             TranslateLanguage.getAllLanguages().sortedBy(::languageName).associateWith(::languageName)
         }
@@ -70,10 +73,18 @@ data object SettingsTranslationScreen : SearchableSettings {
                         // Keeps the key off the screen.
                         subtitle = if (apiKey.isEmpty()) null else "•".repeat(12) + apiKey.takeLast(4),
                     ),
-                    Preference.PreferenceItem.EditTextPreference(
-                        preference = readerPref.geminiModel,
-                        title = stringResource(MR.strings.pref_gemini_model),
-                    ),
+                    if (models.isNullOrEmpty()) {
+                        Preference.PreferenceItem.EditTextPreference(
+                            preference = readerPref.geminiModel,
+                            title = stringResource(MR.strings.pref_gemini_model),
+                        )
+                    } else {
+                        Preference.PreferenceItem.ListPreference(
+                            preference = readerPref.geminiModel,
+                            entries = (listOf(model) + models).distinct().associateWith { it },
+                            title = stringResource(MR.strings.pref_gemini_model),
+                        )
+                    },
                 ),
             ),
         )
