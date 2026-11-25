@@ -102,14 +102,15 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
             onChange = viewModel.preferences.geminiApiKey::set,
         )
         val models = rememberGeminiModels(apiKey)
-        if (models.isNullOrEmpty()) {
+        val ids = (models as? GeminiModelList.Loaded)?.ids.orEmpty()
+        if (ids.isEmpty()) {
             TextItem(
                 label = stringResource(MR.strings.pref_gemini_model),
                 value = model,
                 onChange = viewModel.preferences.geminiModel::set,
             )
         } else {
-            val options = if (model in models) models else listOf(model) + models
+            val options = if (model in ids) ids else listOf(model) + ids
             SelectItem(
                 label = stringResource(MR.strings.pref_gemini_model),
                 options = options.toTypedArray(),
@@ -117,6 +118,15 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
                 onSelect = { viewModel.preferences.geminiModel.set(options[it]) },
             )
         }
+        Text(
+            text = models.description(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                horizontal = SettingsItemsPaddings.Horizontal,
+                vertical = SettingsItemsPaddings.Vertical,
+            ),
+        )
     }
 
     SettingsChipRow(MR.strings.pref_translate_from) {
@@ -146,27 +156,46 @@ internal fun languageName(code: String): String {
 }
 
 /**
- * The Gemini models [apiKey] can use, or null while they load or when they can't be listed, such as without a key or
- * while offline, leaving the model to be typed in.
+ * The Gemini models [apiKey] can use, as Google lists them, or why they aren't listed.
  */
+internal sealed interface GeminiModelList {
+    data object NoKey : GeminiModelList
+    data object Loading : GeminiModelList
+    data class Loaded(val ids: List<String>) : GeminiModelList
+    data class Failed(val reason: String) : GeminiModelList
+}
+
 @Composable
-internal fun rememberGeminiModels(apiKey: String): List<String>? {
+internal fun rememberGeminiModels(apiKey: String): GeminiModelList {
     val context = LocalContext.current
-    val models by produceState<List<String>?>(null, apiKey) {
-        value = null
-        if (apiKey.isBlank()) return@produceState
+    val models by produceState<GeminiModelList>(GeminiModelList.NoKey, apiKey) {
+        if (apiKey.isBlank()) {
+            value = GeminiModelList.NoKey
+            return@produceState
+        }
+        value = GeminiModelList.Loading
         // The key is typed in, so it isn't sent at every letter
         delay(KEY_TYPING_DELAY)
         value = withContext(Dispatchers.IO) {
             try {
-                fetchGeminiModels(context.appGraph.networkHelper.client, apiKey)
+                GeminiModelList.Loaded(fetchGeminiModels(context.appGraph.networkHelper.client, apiKey))
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e) { "Could not list Gemini models" }
-                null
+                GeminiModelList.Failed(e.message ?: e.javaClass.simpleName)
             }
         }
     }
     return models
+}
+
+@Composable
+internal fun GeminiModelList.description(): String {
+    return when (this) {
+        GeminiModelList.NoKey -> stringResource(MR.strings.pref_gemini_models_no_key)
+        GeminiModelList.Loading -> stringResource(MR.strings.pref_gemini_models_loading)
+        is GeminiModelList.Loaded -> stringResource(MR.strings.pref_gemini_models_found, ids.size)
+        is GeminiModelList.Failed -> stringResource(MR.strings.pref_gemini_models_failed, reason)
+    }
 }
 
 private val KEY_TYPING_DELAY = 1.seconds

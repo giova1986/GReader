@@ -412,6 +412,10 @@
     <string name="pref_gemini_summary">Gemini legge ogni pagina con il contesto del capitolo letto finora. Ottieni una chiave API gratuita su aistudio.google.com. Le pagine vengono inviate a Google, che nel piano gratuito può usarle per migliorare i suoi prodotti. Se Gemini non risponde, ad esempio per quota gratuita esaurita, le pagine vengono tradotte sul dispositivo.</string>
     <string name="pref_gemini_api_key">Chiave API di Gemini</string>
     <string name="pref_gemini_model">Modello Gemini</string>
+    <string name="pref_gemini_models_no_key">Inserisci la chiave API per scegliere tra i modelli di Google</string>
+    <string name="pref_gemini_models_loading">Carico i modelli da Google…</string>
+    <string name="pref_gemini_models_found">%1$d modelli disponibili da Google</string>
+    <string name="pref_gemini_models_failed">Impossibile leggere i modelli (%1$s). Scrivi il nome del modello.</string>
     <string name="pref_category_theme">Tema</string>
     <string name="action_sort_date_added">Data di aggiunta</string>
     <string name="channel_progress">Progresso</string>

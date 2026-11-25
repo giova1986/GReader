@@ -20,8 +20,9 @@ fun fetchGeminiModels(client: OkHttpClient, apiKey: String): List<String> {
         }
         val request = Request.Builder().url(url).header("x-goog-api-key", apiKey.trim()).build()
         val page = client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-            json.decodeFromString<ModelPage>(response.body.string())
+            val text = response.body.string()
+            if (!response.isSuccessful) throw IOException(errorOf(text) ?: "HTTP ${response.code}")
+            json.decodeFromString<ModelPage>(text)
         }
         page.models
             .filter { model ->
@@ -33,6 +34,21 @@ fun fetchGeminiModels(client: OkHttpClient, apiKey: String): List<String> {
         pageToken = page.nextPageToken
     } while (!pageToken.isNullOrEmpty())
     return ids.distinct().sortedDescending()
+}
+
+/** Google's own reason, such as an invalid key, which tells the user more than the HTTP status. */
+private fun errorOf(body: String): String? {
+    return try {
+        json.decodeFromString<ErrorBody>(body).error?.message?.take(MAX_ERROR_LENGTH)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Serializable
+private data class ErrorBody(val error: Error? = null) {
+    @Serializable
+    data class Error(val message: String? = null)
 }
 
 @Serializable
@@ -48,6 +64,8 @@ private data class Model(
 )
 
 private val json = Json { ignoreUnknownKeys = true }
+
+private const val MAX_ERROR_LENGTH = 160
 
 private const val MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 

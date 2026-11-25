@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import com.google.mlkit.nl.translate.TranslateLanguage
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.presentation.reader.settings.GeminiModelList
+import eu.kanade.presentation.reader.settings.description
 import eu.kanade.presentation.reader.settings.languageName
 import eu.kanade.presentation.reader.settings.rememberGeminiModels
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
@@ -32,6 +34,7 @@ data object SettingsTranslationScreen : SearchableSettings {
         val apiKey by readerPref.geminiApiKey.collectAsState()
         val model by readerPref.geminiModel.collectAsState()
         val models = rememberGeminiModels(apiKey)
+        val ids = (models as? GeminiModelList.Loaded)?.ids.orEmpty()
         val targets = remember {
             TranslateLanguage.getAllLanguages().sortedBy(::languageName).associateWith(::languageName)
         }
@@ -78,7 +81,7 @@ data object SettingsTranslationScreen : SearchableSettings {
                         // Keeps the key off the screen.
                         subtitle = if (apiKey.isEmpty()) null else "•".repeat(12) + apiKey.takeLast(4),
                     ),
-                    if (models.isNullOrEmpty()) {
+                    if (ids.isEmpty()) {
                         Preference.PreferenceItem.EditTextPreference(
                             preference = readerPref.geminiModel,
                             title = stringResource(MR.strings.pref_gemini_model),
@@ -86,10 +89,11 @@ data object SettingsTranslationScreen : SearchableSettings {
                     } else {
                         Preference.PreferenceItem.ListPreference(
                             preference = readerPref.geminiModel,
-                            entries = (listOf(model) + models).distinct().associateWith { it },
+                            entries = (listOf(model) + ids).distinct().associateWith { it },
                             title = stringResource(MR.strings.pref_gemini_model),
                         )
                     },
+                    Preference.PreferenceItem.InfoPreference(models.description()),
                 ),
             ),
         )
