@@ -71,7 +71,6 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.domain.track.interactor.GetTracks
 import tachiyomi.i18n.MR
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
@@ -424,7 +423,7 @@ class Downloader(
             .sortedBy { it.name }
         withContext(Dispatchers.IO) {
             val glossaries = SeriesGlossaries(readerPreferences)
-            PageTranslator(networkHelper.client, File(context.filesDir, "translation"), glossaries).use { translator ->
+            PageTranslator(context, networkHelper.client, glossaries).use { translator ->
                 pages.forEach { page ->
                     ensureActive()
                     val image = Buffer().apply { page.openInputStream().source().use { writeAll(it) } }

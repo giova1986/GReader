@@ -122,7 +122,6 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.presentation.core.util.collectAsState
-import java.io.File
 
 class ReaderActivity : BaseActivity() {
 
@@ -156,7 +155,7 @@ class ReaderActivity : BaseActivity() {
                     readerPreferences,
                     preferences,
                     networkHelper.client,
-                    File(filesDir, "translation"),
+                    applicationContext,
                 )
             }
         }

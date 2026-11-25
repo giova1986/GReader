@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.setting
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import eu.kanade.domain.base.BasePreferences
@@ -34,7 +35,6 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import okhttp3.OkHttpClient
 import tachiyomi.core.common.preference.Preference
-import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -46,7 +46,7 @@ class ReaderSettingsViewModel(
     val preferences: ReaderPreferences,
     private val basePreferences: BasePreferences,
     client: OkHttpClient,
-    modelDirectory: File,
+    context: Context,
 ) : ViewModel() {
 
     val mangaFlow = readerViewModel.state
@@ -298,7 +298,7 @@ class ReaderSettingsViewModel(
     /**
      * Translates pages for the viewers, kept here so its models stay loaded across viewers.
      */
-    val pageTranslator = PageTranslator(client, modelDirectory, SeriesGlossaries(preferences))
+    val pageTranslator = PageTranslator(context, client, SeriesGlossaries(preferences))
 
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 

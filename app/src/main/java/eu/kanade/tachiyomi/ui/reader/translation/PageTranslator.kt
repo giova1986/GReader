@@ -1,17 +1,11 @@
 package eu.kanade.tachiyomi.ui.reader.translation
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.Typeface
-import android.text.Layout
-import android.text.StaticLayout
-import android.text.TextPaint
-import androidx.core.graphics.ColorUtils
+import androidx.core.content.res.ResourcesCompat
+import eu.kanade.tachiyomi.R
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,9 +21,6 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.model.Chapter
 import java.io.Closeable
 import java.io.File
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 /**
  * Translates the text of pages with the engine the settings pick, painting each translation over its text on a
@@ -37,14 +28,18 @@ import kotlin.math.roundToInt
  * downloaded chapters. Blocking, so never call it on the main thread.
  */
 class PageTranslator(
+    context: Context,
     client: OkHttpClient,
-    private val directory: File,
     private val glossaries: SeriesGlossaries,
 ) : Closeable {
 
+    private val directory = File(context.filesDir, "translation")
     private val mlKit = MlKitTextTranslator()
     private val gemini = GeminiTextTranslator(client)
     private val detector = BubbleDetector(client, directory)
+    private val painter = BubblePainter(
+        ResourcesCompat.getFont(context, R.font.comic_neue_bold) ?: Typeface.DEFAULT_BOLD,
+    )
     private val pages = File(directory, "pages")
 
     private val mutableProblems = MutableSharedFlow<TranslationProblem>(
@@ -103,18 +98,19 @@ class PageTranslator(
         try {
             var complete = true
             val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
+            val regions by lazy { regions(bitmap, settings) }
             val translations = when (settings.engine) {
-                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions(bitmap, settings), glossary)
+                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions, glossary)
                 TranslationEngine.GEMINI -> try {
                     val (found, names) = gemini.translate(bitmap, settings, chapter?.id, glossary)
                     chapter?.let { glossaries.learn(it.mangaId, names) }
-                    found
+                    inBubbles(found, regions)
                 } catch (e: Exception) {
                     // Out of free quota or offline, the page is still worth translating on the device
                     logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
                     mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
                     complete = false
-                    mlKit.translate(bitmap, settings, regions(bitmap, settings), glossary)
+                    mlKit.translate(bitmap, settings, regions, glossary)
                 }
             }
             if (translations.isEmpty()) {
@@ -122,12 +118,7 @@ class PageTranslator(
                 return image to false
             }
 
-            // Sampled before painting, as a painted bubble may border the next one
-            val backgrounds = translations.map { backgroundOf(bitmap, it.bounds) }
-            val canvas = Canvas(bitmap)
-            translations.forEachIndexed { index, translation ->
-                paint(canvas, translation.bounds, backgrounds[index], translation.text)
-            }
+            painter.paint(bitmap, translations)
 
             val translated = Buffer().also {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream())
@@ -156,14 +147,15 @@ class PageTranslator(
     }
 
     /**
-     * What a translated page depends on besides the image, so changing any of it translates pages again.
+     * What a translated page depends on besides the image and the glossary, so changing any of it translates pages
+     * again.
      */
     private fun TranslationSettings.pageKey(): String {
         val engineKey = when (engine) {
-            TranslationEngine.ML_KIT -> "mlkit-$detectBubbles"
+            TranslationEngine.ML_KIT -> "mlkit"
             TranslationEngine.GEMINI -> "gemini-${geminiModel.trim()}"
         }
-        return "${from.name}-$to-$engineKey".replace(Regex("[^A-Za-z0-9._-]"), "_")
+        return "$PAINTING-${from.name}-$to-$engineKey-$detectBubbles".replace(Regex("[^A-Za-z0-9._-]"), "_")
     }
 
     /**
@@ -181,94 +173,24 @@ class PageTranslator(
     }
 
     /**
-     * The average colour just around [bounds], which in a speech bubble is the bubble's.
+     * [translations] each in the bubble of [regions] that holds it, as Gemini's boxes are only around the text.
      */
-    private fun backgroundOf(bitmap: Bitmap, bounds: Rect): Int {
-        val area = Rect(
-            max(0, bounds.left - BORDER_SAMPLE_OFFSET),
-            max(0, bounds.top - BORDER_SAMPLE_OFFSET),
-            min(bitmap.width - 1, bounds.right + BORDER_SAMPLE_OFFSET),
-            min(bitmap.height - 1, bounds.bottom + BORDER_SAMPLE_OFFSET),
-        )
-        var red = 0L
-        var green = 0L
-        var blue = 0L
-        var count = 0
-        fun sample(x: Int, y: Int) {
-            val pixel = bitmap.getPixel(x, y)
-            red += Color.red(pixel)
-            green += Color.green(pixel)
-            blue += Color.blue(pixel)
-            count++
+    private fun inBubbles(translations: List<TranslatedText>, regions: List<TextRegion>): List<TranslatedText> {
+        val bubbles = regions.filter { it.isBubble }
+        return translations.map { translation ->
+            val bubble = bubbles
+                .maxByOrNull { overlap(translation.bounds, it.bounds) }
+                ?.takeIf { overlap(translation.bounds, it.bounds) >= MIN_BUBBLE_OVERLAP }
+            translation.copy(bubble = bubble?.bounds)
         }
-        for (x in area.left..area.right step BORDER_SAMPLE_STEP) {
-            sample(x, area.top)
-            sample(x, area.bottom)
-        }
-        for (y in area.top..area.bottom step BORDER_SAMPLE_STEP) {
-            sample(area.left, y)
-            sample(area.right, y)
-        }
-        return Color.rgb((red / count).toInt(), (green / count).toInt(), (blue / count).toInt())
-    }
-
-    private fun paint(canvas: Canvas, bounds: Rect, background: Int, text: String) {
-        val padding = min(bounds.width(), bounds.height()) * PADDING_RATIO
-        val area = RectF(bounds).apply { inset(-padding, -padding) }
-        // Vertical Japanese columns are too narrow for horizontal text, so the bubble is widened around its centre
-        val minWidth = area.height() * MIN_WIDTH_TO_HEIGHT
-        if (area.width() < minWidth) {
-            val extra = (minWidth - area.width()) / 2
-            area.left = max(0f, area.left - extra)
-            area.right = min(canvas.width.toFloat(), area.right + extra)
-        }
-
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = background }
-        canvas.drawRoundRect(area, padding * 2, padding * 2, fill)
-
-        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (ColorUtils.calculateLuminance(background) > 0.5) Color.BLACK else Color.WHITE
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        val layout = fitText(text, textPaint, area.width().roundToInt(), area.height())
-
-        canvas.save()
-        canvas.translate(area.left, area.centerY() - layout.height / 2f)
-        layout.draw(canvas)
-        canvas.restore()
-    }
-
-    /**
-     * [text] in the largest size that fits [width] by [height] without breaking a word.
-     */
-    private fun fitText(text: String, paint: TextPaint, width: Int, height: Float): StaticLayout {
-        val words = text.split(' ')
-        var low = MIN_TEXT_SIZE
-        var high = max(MIN_TEXT_SIZE, height)
-        while (high - low > 1f) {
-            paint.textSize = (low + high) / 2
-            val fits = layout(text, paint, width).height <= height &&
-                words.all { paint.measureText(it) <= width }
-            if (fits) low = paint.textSize else high = paint.textSize
-        }
-        paint.textSize = low
-        return layout(text, paint, width)
-    }
-
-    private fun layout(text: String, paint: TextPaint, width: Int): StaticLayout {
-        return StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setIncludePad(false)
-            .build()
     }
 
     private companion object {
         const val JPEG_QUALITY = 95
         const val MAX_SAVED_BYTES = 500L * 1024 * 1024
-        const val MIN_TEXT_SIZE = 8f
-        const val PADDING_RATIO = 0.1f
-        const val MIN_WIDTH_TO_HEIGHT = 0.7f
-        const val BORDER_SAMPLE_OFFSET = 4
-        const val BORDER_SAMPLE_STEP = 4
+        const val MIN_BUBBLE_OVERLAP = 0.6f
+
+        /** Changed with how translations are painted, so pages painted before are painted again. */
+        const val PAINTING = "p2"
     }
 }

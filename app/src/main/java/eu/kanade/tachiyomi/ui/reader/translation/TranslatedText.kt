@@ -6,9 +6,25 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The translation of the text found within [bounds] of a page.
+ * The translation of the text found within [bounds] of a page, as [lines] there, in the speech [bubble] holding it
+ * when one was found.
  */
-data class TranslatedText(val bounds: Rect, val text: String)
+data class TranslatedText(
+    val bounds: Rect,
+    val text: String,
+    val lines: List<Rect> = listOf(bounds),
+    val bubble: Rect? = null,
+)
+
+/**
+ * The share of [inner] that lies within [outer].
+ */
+internal fun overlap(inner: Rect, outer: Rect): Float {
+    val intersection = Rect()
+    if (!intersection.setIntersect(inner, outer)) return 0f
+    val area = inner.width().toFloat() * inner.height()
+    return if (area == 0f) 0f else intersection.width().toFloat() * intersection.height() / area
+}
 
 /**
  * Runs [action] on parts of [bitmap] from the top, each with the y it starts at. Long strips are split, as both

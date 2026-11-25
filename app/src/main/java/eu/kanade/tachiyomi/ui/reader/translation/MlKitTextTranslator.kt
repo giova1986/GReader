@@ -48,7 +48,7 @@ class MlKitTextTranslator : Closeable {
         return blocks.mapNotNull { block ->
             // Names put in already translated mostly pass through ML Kit as the glossary has them
             val translated = Tasks.await(translator.translate(glossary.applyTo(block.text))).trim()
-            if (translated.isEmpty()) null else TranslatedText(block.bounds, translated)
+            if (translated.isEmpty()) null else block.copy(text = translated)
         }
     }
 
@@ -82,20 +82,21 @@ class MlKitTextTranslator : Closeable {
             val outside = members - inRegion.toSet()
             val grouped = if (region != null && inRegion.isNotEmpty()) {
                 val bounds = Rect(inRegion.first().bounds).apply { inRegion.forEach { union(it.bounds) } }
-                if (region.isBubble) {
-                    // The bubble's inside gives a longer translation more room than its original lines
-                    val inside = Rect(region.bounds).apply {
-                        inset((width() * BUBBLE_INSET).toInt(), (height() * BUBBLE_INSET).toInt())
-                    }
-                    bounds.union(inside)
-                }
-                listOf(TranslatedText(bounds, readingOrder(inRegion).joinToString(source.lineSeparator) { it.text }))
+                val text = readingOrder(inRegion).joinToString(source.lineSeparator) { it.text }
+                listOf(
+                    TranslatedText(
+                        bounds = bounds,
+                        text = text,
+                        lines = inRegion.map { it.bounds },
+                        bubble = region.bounds.takeIf { region.isBubble },
+                    ),
+                )
             } else {
                 emptyList()
             }
             grouped + outside.groupBy { it.blockId }.values.map { block ->
                 val bounds = Rect(block.first().bounds).apply { block.forEach { union(it.bounds) } }
-                TranslatedText(bounds, block.joinToString(source.lineSeparator) { it.text })
+                TranslatedText(bounds, block.joinToString(source.lineSeparator) { it.text }, block.map { it.bounds })
             }
         }
     }
@@ -108,20 +109,9 @@ class MlKitTextTranslator : Closeable {
         return if (vertical) lines.sortedByDescending { it.bounds.right } else lines.sortedBy { it.bounds.top }
     }
 
-    /**
-     * The share of [line] that lies within [region].
-     */
-    private fun overlap(line: Rect, region: Rect): Float {
-        val intersection = Rect()
-        if (!intersection.setIntersect(line, region)) return 0f
-        val area = line.width().toFloat() * line.height()
-        return if (area == 0f) 0f else intersection.width().toFloat() * intersection.height() / area
-    }
-
     private data class Line(val bounds: Rect, val text: String, val blockId: Int)
 
     private companion object {
         const val MIN_OVERLAP = 0.5f
-        const val BUBBLE_INSET = 0.15f
     }
 }
