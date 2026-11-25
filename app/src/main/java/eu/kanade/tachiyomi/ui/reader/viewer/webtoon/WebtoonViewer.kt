@@ -175,7 +175,10 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
                 frame.doubleTapZoom = new.doubleTapZoom
             }
         }
-        settingsViewModel.translation.collectChanges(scope) { old, _ ->
+        settingsViewModel.translation.collectChanges(scope) { old, new ->
+            // Translating takes seconds, so the pages further down are laid out and translated ahead
+            val screensAhead = if (new.enabled) TRANSLATED_SCREENS_AHEAD else 1
+            layoutManager.extraLayoutSpace = scrollDistance * screensAhead
             if (old != null) {
                 refreshAdapter()
             }
@@ -288,3 +291,4 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
 
 // Double the cache size to reduce rebinds/recycles incurred by the extra layout space on scroll direction changes
 private const val RECYCLER_VIEW_CACHE_SIZE = 4
+private const val TRANSLATED_SCREENS_AHEAD = 4

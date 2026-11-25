@@ -163,7 +163,9 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 refreshAdapter()
             }
         }
-        settingsViewModel.translation.collectChanges(scope) { old, _ ->
+        settingsViewModel.translation.collectChanges(scope) { old, new ->
+            // Translating takes seconds, so the next pages are translated while the current one is read
+            pager.offscreenPageLimit = if (new.enabled) TRANSLATED_PAGES_AHEAD else 1
             if (old != null) {
                 refreshAdapter()
             }
@@ -324,3 +326,5 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 private class DisallowInterceptBarrier(context: Context) : FrameLayout(context) {
     override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) = Unit
 }
+
+private const val TRANSLATED_PAGES_AHEAD = 3
