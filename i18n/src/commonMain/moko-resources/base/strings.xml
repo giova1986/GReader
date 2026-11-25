@@ -520,8 +520,8 @@
     <string name="pref_manga_ocr_summary">A model trained on manga reads vertical text, furigana and hand lettering better, on the device. It needs bubble detection and a one time download of about 120 MB.</string>
     <string name="translation_on">Translation on</string>
     <string name="translation_off">Translation off</string>
-    <string name="translation_online_failed">%1$s failed (%2$s). Translating on the device instead.</string>
-    <string name="translation_failed">Translation failed: %1$s</string>
+    <string name="translation_online_failed">%1$s failed (%2$s). Translating on the device instead. Full text in Translation › Recent errors.</string>
+    <string name="translation_failed">Translation failed: %1$s. Full text in Translation › Recent errors.</string>
     <string name="translation_no_text">No text found on this page. Check the language set in Translate from.</string>
     <string name="pref_translate_from">Translate from</string>
     <string name="pref_translate_to">Translate to</string>
@@ -550,6 +550,9 @@
     <string name="pref_translation_correct">Correct this page</string>
     <string name="pref_translation_correct_summary">Change the translation of a bubble on the page you\'re reading. To compare with the original, tap the globe in the menu.</string>
     <string name="pref_translation_correct_none">This page hasn\'t been translated yet.</string>
+    <string name="pref_translation_errors">Recent errors</string>
+    <string name="pref_translation_errors_summary">The full text of the latest translation errors, to copy and send.</string>
+    <string name="pref_translation_errors_none">No errors since the reader was opened.</string>
     <string name="pref_category_reading">Reading</string>
     <string name="pref_webtoon_side_padding">Side padding</string>
     <string name="pref_hide_threshold">Sensitivity for hiding menu on scroll</string>

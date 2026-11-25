@@ -403,8 +403,8 @@
     <string name="pref_manga_ocr_summary">Un modello addestrato sui manga legge meglio testo verticale, furigana e scritte a mano, sul telefono. Serve il riconoscimento dei balloon e un download di circa 120 MB la prima volta.</string>
     <string name="translation_on">Traduzione attiva</string>
     <string name="translation_off">Traduzione disattivata</string>
-    <string name="translation_online_failed">%1$s non ha funzionato (%2$s). Traduco sul dispositivo.</string>
-    <string name="translation_failed">Traduzione non riuscita: %1$s</string>
+    <string name="translation_online_failed">%1$s non ha funzionato (%2$s). Traduco sul dispositivo. Testo completo in Traduzione › Errori recenti.</string>
+    <string name="translation_failed">Traduzione non riuscita: %1$s. Testo completo in Traduzione › Errori recenti.</string>
     <string name="translation_no_text">Nessun testo trovato in questa pagina. Controlla la lingua in Traduci da.</string>
     <string name="pref_translate_from">Traduci da</string>
     <string name="pref_translate_to">Traduci in</string>
@@ -433,6 +433,9 @@
     <string name="pref_translation_correct">Correggi questa pagina</string>
     <string name="pref_translation_correct_summary">Cambia la traduzione di un balloon nella pagina che stai leggendo. Per confrontarla con l\'originale tocca il mappamondo nel menu.</string>
     <string name="pref_translation_correct_none">Questa pagina non è ancora stata tradotta.</string>
+    <string name="pref_translation_errors">Errori recenti</string>
+    <string name="pref_translation_errors_summary">Il testo completo degli ultimi errori di traduzione, da copiare e inviare.</string>
+    <string name="pref_translation_errors_none">Nessun errore da quando hai aperto il lettore.</string>
     <string name="pref_category_theme">Tema</string>
     <string name="action_sort_date_added">Data di aggiunta</string>
     <string name="channel_progress">Progresso</string>

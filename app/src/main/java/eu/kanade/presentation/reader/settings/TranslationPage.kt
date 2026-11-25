@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -32,6 +33,7 @@ import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.translation.fetchGeminiModels
 import eu.kanade.tachiyomi.ui.reader.translation.fetchOpenRouterModels
+import eu.kanade.tachiyomi.util.system.copyToClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -138,6 +140,61 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
 
     manga?.let { GlossaryItem(viewModel, it.id) }
     CorrectPageItem(viewModel)
+    ErrorsItem(viewModel)
+}
+
+/**
+ * Shows the latest translation errors in full, with a button to copy them for a report.
+ */
+@Composable
+private fun ErrorsItem(viewModel: ReaderSettingsViewModel) {
+    val context = LocalContext.current
+    var errors by remember { mutableStateOf<List<String>?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { errors = viewModel.pageTranslator.recentErrors }
+            .padding(horizontal = SettingsItemsPaddings.Horizontal, vertical = SettingsItemsPaddings.Vertical),
+    ) {
+        Text(text = stringResource(MR.strings.pref_translation_errors), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(MR.strings.pref_translation_errors_summary),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    val shown = errors ?: return
+    val text = shown.joinToString("\n\n")
+    AlertDialog(
+        onDismissRequest = { errors = null },
+        title = { Text(stringResource(MR.strings.pref_translation_errors)) },
+        text = {
+            SelectionContainer(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = text.ifEmpty { stringResource(MR.strings.pref_translation_errors_none) },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    context.copyToClipboard("Honyaku", text)
+                    errors = null
+                },
+                enabled = text.isNotEmpty(),
+            ) {
+                Text(stringResource(MR.strings.action_copy_to_clipboard))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { errors = null }) {
+                Text(stringResource(MR.strings.action_close))
+            }
+        },
+    )
 }
 
 /**

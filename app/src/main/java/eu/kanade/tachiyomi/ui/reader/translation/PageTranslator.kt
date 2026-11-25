@@ -26,6 +26,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.model.Chapter
 import java.io.Closeable
 import java.io.File
+import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -56,6 +57,23 @@ class PageTranslator(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
     val problems: SharedFlow<TranslationProblem> = mutableProblems
+
+    private val errors = ArrayDeque<String>()
+
+    /**
+     * The latest errors in full, newest first, for the user to copy into a report, as a toast is short and gone.
+     */
+    val recentErrors: List<String>
+        get() = synchronized(errors) { errors.toList() }
+
+    private fun record(what: String, error: Throwable) {
+        val causes = generateSequence(error) { it.cause }.take(MAX_CAUSES)
+            .joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message}" }
+        synchronized(errors) {
+            errors.addFirst("${LocalTime.now().withNano(0)} $what: $causes")
+            while (errors.size > MAX_ERRORS) errors.removeLast()
+        }
+    }
 
     /** Bumped when translated pages change without the settings changing, so the viewers show them again. */
     val revision = MutableStateFlow(0)
@@ -108,6 +126,7 @@ class PageTranslator(
             }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to translate page" }
+            record("Page", e)
             mutableProblems.tryEmit(TranslationProblem.Failed(e.message ?: e.javaClass.simpleName))
             image
         }
@@ -165,6 +184,7 @@ class PageTranslator(
         } catch (e: Exception) {
             // Out of free quota or offline, the page is still worth translating on the device
             logcat(LogPriority.WARN, e) { "${settings.engine} failed, translating with ML Kit" }
+            record(settings.engine.name, e)
             val reason = e.message ?: e.javaClass.simpleName
             mutableProblems.tryEmit(TranslationProblem.OnlineFailed(settings.engine, reason))
             mlKit.translate(texts, settings, glossary) to false
@@ -300,6 +320,7 @@ class PageTranslator(
             detector.detect(bitmap)
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Bubble detection failed" }
+            record("Bubble detection", e)
             emptyList()
         }
     }
@@ -314,6 +335,7 @@ class PageTranslator(
                 return mangaOcr.read(bitmap, regions)
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e) { "manga-ocr failed, reading with ML Kit" }
+                record("manga-ocr", e)
             }
         }
         return mlKit.read(bitmap, settings.from, regions)
@@ -337,6 +359,8 @@ class PageTranslator(
         const val JPEG_QUALITY = 95
         const val MAX_SAVED_BYTES = 500L * 1024 * 1024
         const val MIN_BUBBLE_OVERLAP = 0.6f
+        const val MAX_ERRORS = 20
+        const val MAX_CAUSES = 4
 
         /** Changed with how translations are painted, so pages painted before are painted again. */
         const val PAINTING = "p2"
