@@ -185,8 +185,12 @@ class PageTranslator(
             // Out of free quota or offline, the page is still worth translating on the device
             logcat(LogPriority.WARN, e) { "${settings.engine} failed, translating with ML Kit" }
             record(settings.engine.name, e)
-            val reason = e.message ?: e.javaClass.simpleName
-            mutableProblems.tryEmit(TranslationProblem.OnlineFailed(settings.engine, reason))
+            val problem = if (e is RateLimitedException) {
+                TranslationProblem.RateLimited(settings.engine, (e.retryAfterMillis + 999) / 1000)
+            } else {
+                TranslationProblem.OnlineFailed(settings.engine, e.message ?: e.javaClass.simpleName)
+            }
+            mutableProblems.tryEmit(problem)
             mlKit.translate(texts, settings, glossary) to false
         }
     }

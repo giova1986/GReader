@@ -35,10 +35,13 @@ class DeepLTextTranslator(private val client: OkHttpClient) {
             .header("Authorization", "DeepL-Auth-Key $key")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val translations = client.newCall(request).execute().use { response ->
-            val text = response.body.string()
-            if (!response.isSuccessful) throw IOException(apiErrorMessage(text) ?: "HTTP ${response.code}")
-            json.decodeFromString<Response>(text).translations.map { it.text }
+        val translations = OnlineLimiter.run {
+            client.newCall(request).execute().use { response ->
+                val text = response.body.string()
+                rateLimitOf(response, text)?.let { throw it }
+                if (!response.isSuccessful) throw IOException(apiErrorMessage(text) ?: "HTTP ${response.code}")
+                json.decodeFromString<Response>(text).translations.map { it.text }
+            }
         }
         return texts.indices.map { translations.getOrNull(it).orEmpty() }
     }

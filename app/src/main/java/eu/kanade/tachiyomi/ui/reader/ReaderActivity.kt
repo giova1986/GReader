@@ -575,6 +575,10 @@ class ReaderActivity : BaseActivity() {
                 val engine = stringResource(problem.engine.titleRes)
                 stringResource(MR.strings.translation_online_failed, engine, problem.reason)
             }
+            is TranslationProblem.RateLimited -> {
+                val engine = stringResource(problem.engine.titleRes)
+                stringResource(MR.strings.translation_rate_limited, engine, problem.seconds)
+            }
             is TranslationProblem.Failed -> stringResource(MR.strings.translation_failed, problem.reason)
             TranslationProblem.NoText -> stringResource(MR.strings.translation_no_text)
         }

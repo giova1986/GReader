@@ -58,10 +58,13 @@ class OpenRouterTextTranslator(private val client: OkHttpClient) {
             .header("Authorization", "Bearer ${settings.openRouterApiKey.trim()}")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val answer = client.newCall(request).execute().use { response ->
-            val text = response.body.string()
-            if (!response.isSuccessful) throw IOException(apiErrorMessage(text) ?: "HTTP ${response.code}")
-            json.decodeFromString<ChatResponse>(text).choices.firstOrNull()?.message?.content.orEmpty()
+        val answer = OnlineLimiter.run {
+            client.newCall(request).execute().use { response ->
+                val text = response.body.string()
+                rateLimitOf(response, text)?.let { throw it }
+                if (!response.isSuccessful) throw IOException(apiErrorMessage(text) ?: "HTTP ${response.code}")
+                json.decodeFromString<ChatResponse>(text).choices.firstOrNull()?.message?.content.orEmpty()
+            }
         }
         // Not every model keeps to plain JSON, some wrap it in a code block
         val result = json.decodeFromString<Result>(answer.substringAfter('{').substringBeforeLast('}').let { "{$it}" })

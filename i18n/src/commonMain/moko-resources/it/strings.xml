@@ -405,6 +405,7 @@
     <string name="translation_off">Traduzione disattivata</string>
     <string name="translation_online_failed">%1$s non ha funzionato (%2$s). Traduco sul dispositivo. Testo completo in Traduzione › Errori recenti.</string>
     <string name="translation_failed">Traduzione non riuscita: %1$s. Testo completo in Traduzione › Errori recenti.</string>
+    <string name="translation_rate_limited">%1$s per ora non accetta altre richieste (troppe al minuto o quota del giorno finita). Per i prossimi %2$d secondi traduco sul telefono. I modelli Flash-Lite hanno limiti gratuiti più alti.</string>
     <string name="translation_no_text">Nessun testo trovato in questa pagina. Controlla la lingua in Traduci da.</string>
     <string name="pref_translate_from">Traduci da</string>
     <string name="pref_translate_to">Traduci in</string>

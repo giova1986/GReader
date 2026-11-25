@@ -113,10 +113,13 @@ class GeminiTextTranslator(
             .header("x-goog-api-key", settings.geminiApiKey.trim())
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
-        val result = client.newCall(request).execute().use { response ->
-            val text = response.body.string()
-            if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${errorMessage(text)}")
-            json.decodeFromString<GenerateContentResponse>(text)
+        val result = OnlineLimiter.run {
+            client.newCall(request).execute().use { response ->
+                val text = response.body.string()
+                rateLimitOf(response, text)?.let { throw it }
+                if (!response.isSuccessful) throw IOException("HTTP ${response.code}: ${errorMessage(text)}")
+                json.decodeFromString<GenerateContentResponse>(text)
+            }
         }
         result.promptFeedback?.blockReason?.let { throw IOException("Blocked: $it") }
         val candidate = result.candidates.firstOrNull() ?: return Page()
