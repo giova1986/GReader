@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -24,11 +27,13 @@ import androidx.compose.ui.unit.dp
 import com.google.mlkit.nl.translate.TranslateLanguage
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.translation.Glossary
+import eu.kanade.tachiyomi.ui.reader.translation.TranslatedText
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.translation.fetchGeminiModels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.appGraph
@@ -162,6 +167,90 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
 
     val manga by viewModel.mangaFlow.collectAsState()
     manga?.let { GlossaryItem(viewModel, it.id) }
+    CorrectPageItem(viewModel)
+}
+
+/**
+ * Lets the user correct the translations of the page being read, with each original text beside its translation.
+ */
+@Composable
+private fun CorrectPageItem(viewModel: ReaderSettingsViewModel) {
+    // Null while closed, and empty when the page has no translation to correct
+    var editing by remember { mutableStateOf<List<TranslatedText>?>(null) }
+    var page by remember { mutableStateOf<Pair<Long, Int>?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val current = viewModel.currentPage()
+                page = current
+                scope.launch {
+                    editing = current?.let { (chapterId, index) ->
+                        withContext(Dispatchers.IO) { viewModel.pageTranslator.translationsOf(chapterId, index) }
+                    }.orEmpty()
+                }
+            }
+            .padding(horizontal = SettingsItemsPaddings.Horizontal, vertical = SettingsItemsPaddings.Vertical),
+    ) {
+        Text(text = stringResource(MR.strings.pref_translation_correct), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(MR.strings.pref_translation_correct_summary),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    val translations = editing ?: return
+    val drafts = remember(translations) { translations.map { mutableStateOf(it.text) } }
+    AlertDialog(
+        onDismissRequest = { editing = null },
+        title = { Text(stringResource(MR.strings.pref_translation_correct)) },
+        text = {
+            if (translations.isEmpty()) {
+                Text(stringResource(MR.strings.pref_translation_correct_none))
+            } else {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    translations.forEachIndexed { index, translation ->
+                        if (translation.original.isNotBlank()) {
+                            Text(
+                                text = translation.original,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                        OutlinedTextField(
+                            value = drafts[index].value,
+                            onValueChange = { drafts[index].value = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val (chapterId, index) = page ?: return@TextButton
+                    val corrected = translations.mapIndexed { i, translation ->
+                        translation.copy(text = drafts[i].value.trim())
+                    }
+                    scope.launch(Dispatchers.IO) { viewModel.pageTranslator.correct(chapterId, index, corrected) }
+                    editing = null
+                },
+                enabled = translations.isNotEmpty(),
+            ) {
+                Text(stringResource(MR.strings.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { editing = null }) {
+                Text(stringResource(MR.strings.action_cancel))
+            }
+        },
+    )
 }
 
 /**

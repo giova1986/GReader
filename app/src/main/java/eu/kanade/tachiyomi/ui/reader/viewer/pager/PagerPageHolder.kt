@@ -151,7 +151,8 @@ class PagerPageHolder(
                 }
                 // Translating waits on ML Kit's own threads
                 val source = withContext(Dispatchers.IO) {
-                    viewer.pageTranslator.translatePage(processed, viewer.translation, page.chapter.chapter)
+                    val chapter = page.chapter.chapter
+                    viewer.pageTranslator.translatePage(processed, viewer.translation, chapter, page.index)
                 }
                 val isAnimated = ImageUtil.isAnimatedAndSupported(source)
                 val background = if (!isAnimated && viewer.general.automaticBackground) {

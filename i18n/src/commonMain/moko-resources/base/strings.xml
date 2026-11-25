@@ -536,6 +536,9 @@
     <string name="pref_translation_glossary">Series glossary</string>
     <string name="pref_translation_glossary_summary">%1$d names and terms always translated the same way</string>
     <string name="pref_translation_glossary_help">One per line, as original = translation, for example ルフィ = Luffy. Gemini adds the names it finds. Saving translates this series\' pages again.</string>
+    <string name="pref_translation_correct">Correct this page</string>
+    <string name="pref_translation_correct_summary">Change the translation of a bubble on the page you\'re reading. To compare with the original, tap the globe in the menu.</string>
+    <string name="pref_translation_correct_none">This page hasn\'t been translated yet.</string>
     <string name="pref_category_reading">Reading</string>
     <string name="pref_webtoon_side_padding">Side padding</string>
     <string name="pref_hide_threshold">Sensitivity for hiding menu on scroll</string>

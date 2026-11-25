@@ -419,6 +419,9 @@
     <string name="pref_translation_glossary">Glossario della serie</string>
     <string name="pref_translation_glossary_summary">%1$d nomi e termini tradotti sempre allo stesso modo</string>
     <string name="pref_translation_glossary_help">Uno per riga, come originale = traduzione, per esempio ルフィ = Rufy. Gemini aggiunge da solo i nomi che trova. Salvando, le pagine di questa serie vengono tradotte di nuovo.</string>
+    <string name="pref_translation_correct">Correggi questa pagina</string>
+    <string name="pref_translation_correct_summary">Cambia la traduzione di un balloon nella pagina che stai leggendo. Per confrontarla con l\'originale tocca il mappamondo nel menu.</string>
+    <string name="pref_translation_correct_none">Questa pagina non è ancora stata tradotta.</string>
     <string name="pref_category_theme">Tema</string>
     <string name="action_sort_date_added">Data di aggiunta</string>
     <string name="channel_progress">Progresso</string>

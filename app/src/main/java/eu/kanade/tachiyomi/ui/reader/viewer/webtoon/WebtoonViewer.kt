@@ -183,6 +183,12 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
                 refreshAdapter()
             }
         }
+        // A corrected page or a changed glossary
+        settingsViewModel.pageTranslator.revision.collectChanges(scope) { old, _ ->
+            if (old != null) {
+                refreshAdapter()
+            }
+        }
 
         frame.layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
         frame.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS

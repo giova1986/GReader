@@ -48,7 +48,7 @@ class MlKitTextTranslator : Closeable {
         return blocks.mapNotNull { block ->
             // Names put in already translated mostly pass through ML Kit as the glossary has them
             val translated = Tasks.await(translator.translate(glossary.applyTo(block.text))).trim()
-            if (translated.isEmpty()) null else block.copy(text = translated)
+            if (translated.isEmpty()) null else block.copy(text = translated, original = block.text)
         }
     }
 
@@ -96,7 +96,11 @@ class MlKitTextTranslator : Closeable {
             }
             grouped + outside.groupBy { it.blockId }.values.map { block ->
                 val bounds = Rect(block.first().bounds).apply { block.forEach { union(it.bounds) } }
-                TranslatedText(bounds, block.joinToString(source.lineSeparator) { it.text }, block.map { it.bounds })
+                TranslatedText(
+                    bounds = bounds,
+                    text = block.joinToString(source.lineSeparator) { it.text },
+                    lines = block.map { it.bounds },
+                )
             }
         }
     }

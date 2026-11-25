@@ -3,12 +3,17 @@ package eu.kanade.tachiyomi.ui.reader.translation
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Rect
 import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
 import eu.kanade.tachiyomi.R
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import logcat.LogPriority
 import okhttp3.OkHttpClient
 import okio.Buffer
@@ -21,6 +26,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.model.Chapter
 import java.io.Closeable
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Translates the text of pages with the engine the settings pick, painting each translation over its text on a
@@ -48,23 +54,55 @@ class PageTranslator(
     )
     val problems: SharedFlow<TranslationProblem> = mutableProblems
 
+    /** Bumped when translated pages change without the settings changing, so the viewers show them again. */
+    val revision = MutableStateFlow(0)
+
+    /** The saved translation of each page of a chapter that was last shown, for it to be corrected. */
+    private val shown = ConcurrentHashMap<Pair<Long, Int>, String>()
+
     /**
      * [image] translated when [settings] enable it, or [image] itself when it can't be: an animated image, or a
      * failure such as the language model not downloading while offline, so the page still shows. A page of
      * [chapter] gets the chapter's earlier pages as context where the engine uses it, and its series' glossary.
+     * Giving the [pageIndex] lets its translation be corrected.
      */
-    fun translatePage(image: BufferedSource, settings: TranslationSettings, chapter: Chapter?): BufferedSource {
+    fun translatePage(
+        image: BufferedSource,
+        settings: TranslationSettings,
+        chapter: Chapter?,
+        pageIndex: Int? = null,
+    ): BufferedSource {
         if (!settings.enabled || ImageUtil.isAnimatedAndSupported(image)) return image
         val hash = image.peek().readByteString().sha256().hex()
-        val saved = File(pages, "${chapter?.mangaId ?: 0}-$hash-${settings.pageKey()}.jpg")
+        val name = "${chapter?.mangaId ?: 0}-$hash-${settings.pageKey()}"
+        if (chapter != null && pageIndex != null) shown[chapter.id to pageIndex] = name
+        val saved = File(pages, "$name.jpg")
+        val texts = File(pages, "$name.json")
         if (saved.exists()) {
             saved.setLastModified(System.currentTimeMillis())
+            texts.setLastModified(System.currentTimeMillis())
             return Buffer().apply { saved.source().use { writeAll(it) } }
         }
         return try {
-            val (translated, complete) = translate(image, settings, chapter)
-            if (complete) save(translated, saved)
-            translated
+            val options = BitmapFactory.Options().apply { inMutable = true }
+            val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image
+            try {
+                // A page translated before, or corrected since, is painted again without asking an engine
+                val (translations, complete) = readTexts(texts)?.let { it to true }
+                    ?: translate(bitmap, settings, chapter)
+                if (translations.isEmpty()) {
+                    mutableProblems.tryEmit(TranslationProblem.NoText)
+                    return image
+                }
+                painter.paint(bitmap, translations)
+                val translated = Buffer().also {
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream())
+                }
+                if (complete) save(translated, saved, translations, texts)
+                translated
+            } finally {
+                bitmap.recycle()
+            }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to translate page" }
             mutableProblems.tryEmit(TranslationProblem.Failed(e.message ?: e.javaClass.simpleName))
@@ -73,10 +111,29 @@ class PageTranslator(
     }
 
     /**
+     * The translations of the page at [pageIndex] of [chapterId] as last shown, or null when it wasn't translated.
+     */
+    fun translationsOf(chapterId: Long, pageIndex: Int): List<TranslatedText>? {
+        val name = shown[chapterId to pageIndex] ?: return null
+        return readTexts(File(pages, "$name.json"))
+    }
+
+    /**
+     * Shows the page at [pageIndex] of [chapterId] with [translations] the user corrected.
+     */
+    fun correct(chapterId: Long, pageIndex: Int, translations: List<TranslatedText>) {
+        val name = shown[chapterId to pageIndex] ?: return
+        writeTexts(File(pages, "$name.json"), translations)
+        File(pages, "$name.jpg").delete()
+        revision.update { it + 1 }
+    }
+
+    /**
      * Drops the translated pages of [mangaId], so they're translated again with its changed glossary.
      */
     fun forget(mangaId: Long) {
         pages.listFiles().orEmpty().filter { it.name.startsWith("$mangaId-") }.forEach(File::delete)
+        revision.update { it + 1 }
     }
 
     override fun close() {
@@ -85,55 +142,38 @@ class PageTranslator(
     }
 
     /**
-     * [image] translated, and whether it was translated as [settings] ask, rather than on the device after Gemini
-     * failed, so a page is only kept when asking again wouldn't do better.
+     * The translations of [bitmap], and whether they were made as [settings] ask, rather than on the device after
+     * Gemini failed, so a page is only kept when asking again wouldn't do better.
      */
     private fun translate(
-        image: BufferedSource,
+        bitmap: Bitmap,
         settings: TranslationSettings,
         chapter: Chapter?,
-    ): Pair<BufferedSource, Boolean> {
-        val options = BitmapFactory.Options().apply { inMutable = true }
-        val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image to false
-        try {
-            var complete = true
-            val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
-            val regions by lazy { regions(bitmap, settings) }
-            val translations = when (settings.engine) {
-                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions, glossary)
-                TranslationEngine.GEMINI -> try {
-                    val (found, names) = gemini.translate(bitmap, settings, chapter?.id, glossary)
-                    chapter?.let { glossaries.learn(it.mangaId, names) }
-                    inBubbles(found, regions)
-                } catch (e: Exception) {
-                    // Out of free quota or offline, the page is still worth translating on the device
-                    logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
-                    mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
-                    complete = false
-                    mlKit.translate(bitmap, settings, regions, glossary)
-                }
+    ): Pair<List<TranslatedText>, Boolean> {
+        val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
+        val regions by lazy { regions(bitmap, settings) }
+        return when (settings.engine) {
+            TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions, glossary) to true
+            TranslationEngine.GEMINI -> try {
+                val (found, names) = gemini.translate(bitmap, settings, chapter?.id, glossary)
+                chapter?.let { glossaries.learn(it.mangaId, names) }
+                inBubbles(found, regions) to true
+            } catch (e: Exception) {
+                // Out of free quota or offline, the page is still worth translating on the device
+                logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
+                mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
+                mlKit.translate(bitmap, settings, regions, glossary) to false
             }
-            if (translations.isEmpty()) {
-                mutableProblems.tryEmit(TranslationProblem.NoText)
-                return image to false
-            }
-
-            painter.paint(bitmap, translations)
-
-            val translated = Buffer().also {
-                bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it.outputStream())
-            }
-            return translated to complete
-        } finally {
-            bitmap.recycle()
         }
     }
 
     /**
-     * Keeps [page] as [file], then drops the pages read longest ago once they take more than [MAX_SAVED_BYTES].
+     * Keeps [page] as [file] and its [translations] as [texts], then drops the pages read longest ago once they
+     * take more than [MAX_SAVED_BYTES].
      */
-    private fun save(page: BufferedSource, file: File) {
+    private fun save(page: BufferedSource, file: File, translations: List<TranslatedText>, texts: File) {
         pages.mkdirs()
+        writeTexts(texts, translations)
         val partial = File(pages, "${file.name}.part")
         partial.sink().buffer().use { it.writeAll(page.peek()) }
         partial.renameTo(file)
@@ -143,6 +183,55 @@ class PageTranslator(
         saved.forEach {
             total += it.length()
             if (total > MAX_SAVED_BYTES) it.delete()
+        }
+    }
+
+    private fun readTexts(file: File): List<TranslatedText>? {
+        if (!file.exists()) return null
+        return try {
+            json.decodeFromString<List<SavedText>>(file.readText()).map(SavedText::toTranslatedText)
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Could not read a saved translation" }
+            null
+        }
+    }
+
+    private fun writeTexts(file: File, translations: List<TranslatedText>) {
+        pages.mkdirs()
+        file.writeText(json.encodeToString(translations.map(SavedText::of)))
+    }
+
+    @Serializable
+    private data class SavedText(
+        val bounds: List<Int>,
+        val text: String,
+        val original: String = "",
+        val lines: List<List<Int>> = emptyList(),
+        val bubble: List<Int>? = null,
+    ) {
+        fun toTranslatedText(): TranslatedText {
+            val bounds = rectOf(bounds)
+            return TranslatedText(
+                bounds = bounds,
+                text = text,
+                original = original,
+                lines = lines.map(::rectOf).ifEmpty { listOf(bounds) },
+                bubble = bubble?.let(::rectOf),
+            )
+        }
+
+        companion object {
+            fun of(translation: TranslatedText) = SavedText(
+                bounds = valuesOf(translation.bounds),
+                text = translation.text,
+                original = translation.original,
+                lines = translation.lines.map(::valuesOf),
+                bubble = translation.bubble?.let(::valuesOf),
+            )
+
+            private fun valuesOf(rect: Rect) = listOf(rect.left, rect.top, rect.right, rect.bottom)
+
+            private fun rectOf(values: List<Int>) = Rect(values[0], values[1], values[2], values[3])
         }
     }
 
@@ -186,6 +275,7 @@ class PageTranslator(
     }
 
     private companion object {
+        val json = Json { ignoreUnknownKeys = true }
         const val JPEG_QUALITY = 95
         const val MAX_SAVED_BYTES = 500L * 1024 * 1024
         const val MIN_BUBBLE_OVERLAP = 0.6f

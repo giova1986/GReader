@@ -6,12 +6,13 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The translation of the text found within [bounds] of a page, as [lines] there, in the speech [bubble] holding it
- * when one was found.
+ * The translation of the [original] text found within [bounds] of a page, as [lines] there, in the speech [bubble]
+ * holding it when one was found.
  */
 data class TranslatedText(
     val bounds: Rect,
     val text: String,
+    val original: String = "",
     val lines: List<Rect> = listOf(bounds),
     val bubble: Rect? = null,
 )

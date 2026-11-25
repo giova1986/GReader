@@ -65,7 +65,7 @@ class GeminiTextTranslator(
                     top + tile.height * yMax / BOX_SCALE,
                 )
                 val text = bubble.translation.trim()
-                if (bounds.isEmpty || text.isEmpty()) null else TranslatedText(bounds, text)
+                if (bounds.isEmpty || text.isEmpty()) null else TranslatedText(bounds, text, bubble.original.trim())
             }
             if (lines != null) {
                 synchronized(lines) {

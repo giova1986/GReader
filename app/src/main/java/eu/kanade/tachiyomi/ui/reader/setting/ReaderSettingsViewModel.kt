@@ -300,6 +300,15 @@ class ReaderSettingsViewModel(
      */
     val pageTranslator = PageTranslator(context, client, SeriesGlossaries(preferences))
 
+    /**
+     * The chapter id and index of the page being read, or null before a chapter loads.
+     */
+    fun currentPage(): Pair<Long, Int>? {
+        val state = readerViewModel.state.value
+        val chapterId = state.currentChapter?.chapter?.id ?: return null
+        return (chapterId to state.currentPage - 1).takeIf { it.second >= 0 }
+    }
+
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 
     /**

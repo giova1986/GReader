@@ -170,6 +170,12 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 refreshAdapter()
             }
         }
+        // A corrected page or a changed glossary
+        settingsViewModel.pageTranslator.revision.collectChanges(scope) { old, _ ->
+            if (old != null) {
+                refreshAdapter()
+            }
+        }
     }
 
     override fun destroy() {
