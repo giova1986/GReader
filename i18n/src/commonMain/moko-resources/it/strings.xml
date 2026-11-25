@@ -401,7 +401,7 @@
     <string name="pref_detect_bubbles_summary">Legge insieme tutto il testo di ogni fumetto prima di tradurlo, con un modello che funziona su questo dispositivo. Si scarica una volta, circa 11 MB.</string>
     <string name="translation_on">Traduzione attiva</string>
     <string name="translation_off">Traduzione disattivata</string>
-    <string name="translation_gemini_failed">Gemini non ha funzionato (%1$s). Traduco sul dispositivo.</string>
+    <string name="translation_online_failed">%1$s non ha funzionato (%2$s). Traduco sul dispositivo.</string>
     <string name="translation_failed">Traduzione non riuscita: %1$s</string>
     <string name="translation_no_text">Nessun testo trovato in questa pagina. Controlla la lingua in Traduci da.</string>
     <string name="pref_translate_from">Traduci da</string>
@@ -409,6 +409,15 @@
     <string name="pref_translation_engine">Traduttore</string>
     <string name="translation_engine_on_device">Sul dispositivo</string>
     <string name="translation_engine_gemini">Gemini (online)</string>
+    <string name="translation_engine_openrouter">OpenRouter (online)</string>
+    <string name="translation_engine_deepl">DeepL (online)</string>
+    <string name="pref_openrouter_summary">Un modello linguistico a tua scelta su OpenRouter traduce il testo letto sul telefono, con il contesto del capitolo letto finora. La chiave si crea su openrouter.ai. I modelli che finiscono con :free sono gratuiti.</string>
+    <string name="pref_openrouter_api_key">Chiave API di OpenRouter</string>
+    <string name="pref_openrouter_model">Modello OpenRouter</string>
+    <string name="pref_deepl_summary">DeepL traduce il testo letto sul telefono. La chiave si crea su deepl.com, il piano gratuito permette 500.000 caratteri al mese.</string>
+    <string name="pref_deepl_api_key">Chiave API di DeepL</string>
+    <string name="pref_series_engine">Traduttore per questa serie</string>
+    <string name="pref_series_engine_default">Come nelle impostazioni</string>
     <string name="pref_gemini_summary">Gemini legge ogni pagina con il contesto del capitolo letto finora. Ottieni una chiave API gratuita su aistudio.google.com. Le pagine vengono inviate a Google, che nel piano gratuito può usarle per migliorare i suoi prodotti. Se Gemini non risponde, ad esempio per quota gratuita esaurita, le pagine vengono tradotte sul dispositivo.</string>
     <string name="pref_gemini_api_key">Chiave API di Gemini</string>
     <string name="pref_gemini_model">Modello Gemini</string>

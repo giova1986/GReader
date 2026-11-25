@@ -416,7 +416,7 @@ class Downloader(
      * fails is left for the reader to translate.
      */
     private suspend fun translateChapter(download: Download, tmpDir: UniFile) {
-        val settings = readerPreferences.translationSettings()
+        val settings = readerPreferences.translationSettings(download.manga.id)
         if (!settings.enabled || !readerPreferences.translateDownloads.get()) return
         val pages = tmpDir.listFiles().orEmpty()
             .filter { file -> file.isFile && ImageUtil.isImage(file.name) { file.openInputStream() } }

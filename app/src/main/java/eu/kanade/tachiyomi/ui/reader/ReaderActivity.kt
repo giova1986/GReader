@@ -571,7 +571,10 @@ class ReaderActivity : BaseActivity() {
         if (problem == last && now - shownAt < TRANSLATION_PROBLEM_INTERVAL) return
         lastTranslationProblem = problem to now
         val text = when (problem) {
-            is TranslationProblem.GeminiFailed -> stringResource(MR.strings.translation_gemini_failed, problem.reason)
+            is TranslationProblem.OnlineFailed -> {
+                val engine = stringResource(problem.engine.titleRes)
+                stringResource(MR.strings.translation_online_failed, engine, problem.reason)
+            }
             is TranslationProblem.Failed -> stringResource(MR.strings.translation_failed, problem.reason)
             TranslationProblem.NoText -> stringResource(MR.strings.translation_no_text)
         }

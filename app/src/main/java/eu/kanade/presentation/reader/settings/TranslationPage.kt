@@ -31,12 +31,14 @@ import eu.kanade.tachiyomi.ui.reader.translation.TranslatedText
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.translation.fetchGeminiModels
+import eu.kanade.tachiyomi.ui.reader.translation.fetchOpenRouterModels
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.appGraph
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.CheckboxItem
@@ -100,50 +102,11 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
         }
     }
 
-    if (engine == TranslationEngine.GEMINI) {
-        val apiKey by viewModel.preferences.geminiApiKey.collectAsState()
-        val model by viewModel.preferences.geminiModel.collectAsState()
-        Text(
-            text = stringResource(MR.strings.pref_gemini_summary),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = SettingsItemsPaddings.Horizontal,
-                vertical = SettingsItemsPaddings.Vertical,
-            ),
-        )
-        TextItem(
-            label = stringResource(MR.strings.pref_gemini_api_key),
-            value = apiKey,
-            onChange = viewModel.preferences.geminiApiKey::set,
-        )
-        val models = rememberGeminiModels(apiKey)
-        val ids = (models as? GeminiModelList.Loaded)?.ids.orEmpty()
-        if (ids.isEmpty()) {
-            TextItem(
-                label = stringResource(MR.strings.pref_gemini_model),
-                value = model,
-                onChange = viewModel.preferences.geminiModel::set,
-            )
-        } else {
-            val options = if (model in ids) ids else listOf(model) + ids
-            SelectItem(
-                label = stringResource(MR.strings.pref_gemini_model),
-                options = options.toTypedArray(),
-                selectedIndex = options.indexOf(model),
-                onSelect = { viewModel.preferences.geminiModel.set(options[it]) },
-            )
-        }
-        Text(
-            text = models.description(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = SettingsItemsPaddings.Horizontal,
-                vertical = SettingsItemsPaddings.Vertical,
-            ),
-        )
-    }
+    val manga by viewModel.mangaFlow.collectAsState()
+    val seriesPreference = remember(manga?.id) { manga?.let { viewModel.preferences.seriesTranslationEngine(it.id) } }
+    val seriesEngine = seriesPreference?.collectAsState()?.value
+    seriesPreference?.let { SeriesEngineRow(it, seriesEngine.orEmpty()) }
+    EngineOptions(viewModel, TranslationEngine.entries.find { it.name == seriesEngine } ?: engine)
 
     SettingsChipRow(MR.strings.pref_translate_from) {
         TranslationSource.entries.forEach { source ->
@@ -165,7 +128,6 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
         onSelect = { viewModel.preferences.translateTo.set(targets[it]) },
     )
 
-    val manga by viewModel.mangaFlow.collectAsState()
     manga?.let { GlossaryItem(viewModel, it.id) }
     CorrectPageItem(viewModel)
 }
@@ -251,6 +213,151 @@ private fun CorrectPageItem(viewModel: ReaderSettingsViewModel) {
             }
         },
     )
+}
+
+/**
+ * Lets the series being read be translated with another engine than the others.
+ */
+@Composable
+private fun SeriesEngineRow(preference: Preference<String>, selected: String) {
+    SettingsChipRow(MR.strings.pref_series_engine) {
+        FilterChip(
+            selected = selected.isEmpty(),
+            onClick = { preference.set("") },
+            label = { Text(stringResource(MR.strings.pref_series_engine_default)) },
+        )
+        TranslationEngine.entries.forEach {
+            FilterChip(
+                selected = selected == it.name,
+                onClick = { preference.set(it.name) },
+                label = { Text(stringResource(it.titleRes)) },
+            )
+        }
+    }
+}
+
+/**
+ * The key and model of [engine], the one pages are translated with.
+ */
+@Composable
+private fun EngineOptions(viewModel: ReaderSettingsViewModel, engine: TranslationEngine) {
+    when (engine) {
+        TranslationEngine.ML_KIT -> Unit
+        TranslationEngine.GEMINI -> GeminiOptions(viewModel)
+        TranslationEngine.OPENROUTER -> {
+            val apiKey by viewModel.preferences.openRouterApiKey.collectAsState()
+            val model by viewModel.preferences.openRouterModel.collectAsState()
+            Summary(stringResource(MR.strings.pref_openrouter_summary))
+            TextItem(
+                label = stringResource(MR.strings.pref_openrouter_api_key),
+                value = apiKey,
+                onChange = viewModel.preferences.openRouterApiKey::set,
+            )
+            val models = rememberOpenRouterModels()
+            if (models.isEmpty()) {
+                TextItem(
+                    label = stringResource(MR.strings.pref_openrouter_model),
+                    value = model,
+                    onChange = viewModel.preferences.openRouterModel::set,
+                )
+            } else {
+                val options = if (model in models) models else listOf(model) + models
+                SelectItem(
+                    label = stringResource(MR.strings.pref_openrouter_model),
+                    options = options.toTypedArray(),
+                    selectedIndex = options.indexOf(model),
+                    onSelect = { viewModel.preferences.openRouterModel.set(options[it]) },
+                )
+            }
+        }
+        TranslationEngine.DEEPL -> {
+            val apiKey by viewModel.preferences.deeplApiKey.collectAsState()
+            Summary(stringResource(MR.strings.pref_deepl_summary))
+            TextItem(
+                label = stringResource(MR.strings.pref_deepl_api_key),
+                value = apiKey,
+                onChange = viewModel.preferences.deeplApiKey::set,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GeminiOptions(viewModel: ReaderSettingsViewModel) {
+    val apiKey by viewModel.preferences.geminiApiKey.collectAsState()
+    val model by viewModel.preferences.geminiModel.collectAsState()
+    Text(
+        text = stringResource(MR.strings.pref_gemini_summary),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsItemsPaddings.Horizontal,
+            vertical = SettingsItemsPaddings.Vertical,
+        ),
+    )
+    TextItem(
+        label = stringResource(MR.strings.pref_gemini_api_key),
+        value = apiKey,
+        onChange = viewModel.preferences.geminiApiKey::set,
+    )
+    val models = rememberGeminiModels(apiKey)
+    val ids = (models as? GeminiModelList.Loaded)?.ids.orEmpty()
+    if (ids.isEmpty()) {
+        TextItem(
+            label = stringResource(MR.strings.pref_gemini_model),
+            value = model,
+            onChange = viewModel.preferences.geminiModel::set,
+        )
+    } else {
+        val options = if (model in ids) ids else listOf(model) + ids
+        SelectItem(
+            label = stringResource(MR.strings.pref_gemini_model),
+            options = options.toTypedArray(),
+            selectedIndex = options.indexOf(model),
+            onSelect = { viewModel.preferences.geminiModel.set(options[it]) },
+        )
+    }
+    Text(
+        text = models.description(),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsItemsPaddings.Horizontal,
+            vertical = SettingsItemsPaddings.Vertical,
+        ),
+    )
+}
+
+@Composable
+private fun Summary(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            horizontal = SettingsItemsPaddings.Horizontal,
+            vertical = SettingsItemsPaddings.Vertical,
+        ),
+    )
+}
+
+/**
+ * The models on OpenRouter, or none while they load or when they can't be listed, leaving the model to be typed in.
+ */
+@Composable
+internal fun rememberOpenRouterModels(): List<String> {
+    val context = LocalContext.current
+    val models by produceState(emptyList<String>()) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                fetchOpenRouterModels(context.appGraph.networkHelper.client)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Could not list OpenRouter models" }
+                emptyList()
+            }
+        }
+    }
+    return models
 }
 
 /**

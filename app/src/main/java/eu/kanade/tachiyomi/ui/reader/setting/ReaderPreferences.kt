@@ -294,20 +294,44 @@ class ReaderPreferences(
 
     val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.1-flash-lite")
 
+    val openRouterApiKey: Preference<String> = preferenceStore.getString(
+        Preference.privateKey("pref_openrouter_api_key"),
+    )
+
+    val openRouterModel: Preference<String> = preferenceStore.getString("pref_openrouter_model", "")
+
+    val deeplApiKey: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_deepl_api_key"))
+
+    /** The name of the [TranslationEngine] a series is translated with, or empty for [translationEngine]. */
+    fun seriesTranslationEngine(mangaId: Long): Preference<String> {
+        return preferenceStore.getString("pref_translation_engine_$mangaId", "")
+    }
+
     /** The glossary of a series, as lines of `original = translation`. */
     fun translationGlossary(mangaId: Long): Preference<String> {
         return preferenceStore.getString("pref_translation_glossary_$mangaId", "")
     }
 
-    fun translationSettings() = TranslationSettings(
+    /**
+     * The translation settings, with the engine [mangaId] is translated with when given.
+     */
+    fun translationSettings(mangaId: Long? = null) = TranslationSettings(
         enabled = translatePages.get(),
-        engine = translationEngine.get(),
+        engine = mangaId?.let { seriesEngineOf(it) } ?: translationEngine.get(),
         from = translateFrom.get(),
         to = translateTo.get(),
         detectBubbles = detectBubbles.get(),
         geminiApiKey = geminiApiKey.get(),
         geminiModel = geminiModel.get(),
+        openRouterApiKey = openRouterApiKey.get(),
+        openRouterModel = openRouterModel.get(),
+        deeplApiKey = deeplApiKey.get(),
     )
+
+    fun seriesEngineOf(mangaId: Long): TranslationEngine? {
+        val name = seriesTranslationEngine(mangaId).get()
+        return TranslationEngine.entries.find { it.name == name }
+    }
 
     // endregion
 

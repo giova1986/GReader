@@ -22,8 +22,17 @@ class MlKitTextTranslator : Closeable {
     private val translators = ConcurrentHashMap<Pair<String, String>, Translator>()
 
     /**
-     * Lines within one of [regions] are read together and the translation fills the region, while other lines are
-     * grouped as ML Kit sees blocks of text. The terms of [glossary] are put in before translating.
+     * The text of [bitmap], untranslated: lines within one of [regions] are read together, while other lines are
+     * grouped as ML Kit sees blocks of text.
+     */
+    fun read(bitmap: Bitmap, source: TranslationSource, regions: List<TextRegion> = emptyList()): List<TranslatedText> {
+        val lines = recognize(bitmap, source)
+        if (lines.isEmpty()) return emptyList()
+        return group(lines, regions, source).map { it.copy(original = it.text) }
+    }
+
+    /**
+     * The text of [bitmap] read as [read] does and translated, with the terms of [glossary] put in before.
      */
     fun translate(
         bitmap: Bitmap,
@@ -31,9 +40,8 @@ class MlKitTextTranslator : Closeable {
         regions: List<TextRegion> = emptyList(),
         glossary: Glossary = Glossary.EMPTY,
     ): List<TranslatedText> {
-        val lines = recognize(bitmap, settings.from)
-        if (lines.isEmpty()) return emptyList()
-        val blocks = group(lines, regions, settings.from)
+        val blocks = read(bitmap, settings.from, regions)
+        if (blocks.isEmpty()) return emptyList()
 
         val translator = translators.getOrPut(settings.from.language to settings.to) {
             Translation.getClient(
@@ -48,7 +56,7 @@ class MlKitTextTranslator : Closeable {
         return blocks.mapNotNull { block ->
             // Names put in already translated mostly pass through ML Kit as the glossary has them
             val translated = Tasks.await(translator.translate(glossary.applyTo(block.text))).trim()
-            if (translated.isEmpty()) null else block.copy(text = translated, original = block.text)
+            if (translated.isEmpty()) null else block.copy(text = translated)
         }
     }
 

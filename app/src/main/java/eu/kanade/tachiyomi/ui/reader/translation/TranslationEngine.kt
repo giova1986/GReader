@@ -15,4 +15,10 @@ enum class TranslationEngine(val titleRes: StringResource) {
      * context of the chapter so far.
      */
     GEMINI(MR.strings.translation_engine_gemini),
+
+    /** A language model of the user's choice on OpenRouter, given the text read on the device. */
+    OPENROUTER(MR.strings.translation_engine_openrouter),
+
+    /** DeepL, given the text read on the device. */
+    DEEPL(MR.strings.translation_engine_deepl),
 }

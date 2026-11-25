@@ -8,6 +8,7 @@ import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
 import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
 import eu.kanade.tachiyomi.ui.reader.translation.SeriesGlossaries
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.NavigationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
@@ -283,17 +284,30 @@ class ReaderSettingsViewModel(
         preferences.translationEngine,
         preferences.geminiApiKey,
         preferences.geminiModel,
+        preferences.openRouterApiKey,
+        preferences.openRouterModel,
+        preferences.deeplApiKey,
     ) {
         translationSettings()
+    }
+
+    /** Changes when the series being read is given its own engine. */
+    private val seriesEngine = mangaFlow.flatMapLatest { manga ->
+        manga?.let { preferences.seriesTranslationEngine(it.id).changes() } ?: flowOf("")
     }
 
     /**
      * Settings of the translation of pages, which every viewer but the WebGPU ones applies.
      */
-    val translation = typedTranslation
-        // The Gemini key and model are typed in, so pages aren't remade at every letter
+    val translation = combine(typedTranslation, seriesEngine) { settings, _ -> settings.forSeries() }
+        // The keys and models are typed in, so pages aren't remade at every letter
         .debounce(1.seconds)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, typedTranslation.value)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, typedTranslation.value.forSeries())
+
+    private fun TranslationSettings.forSeries(): TranslationSettings {
+        val engine = readerViewModel.state.value.manga?.let { preferences.seriesEngineOf(it.id) } ?: return this
+        return copy(engine = engine)
+    }
 
     /**
      * Translates pages for the viewers, kept here so its models stay loaded across viewers.

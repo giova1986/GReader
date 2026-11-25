@@ -14,4 +14,7 @@ data class TranslationSettings(
     val detectBubbles: Boolean,
     val geminiApiKey: String,
     val geminiModel: String,
+    val openRouterApiKey: String,
+    val openRouterModel: String,
+    val deeplApiKey: String,
 )

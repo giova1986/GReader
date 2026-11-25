@@ -518,7 +518,7 @@
     <string name="pref_detect_bubbles_summary">Reads the text of each speech bubble together before translating it, with a model that runs on this device. It downloads once, about 11 MB.</string>
     <string name="translation_on">Translation on</string>
     <string name="translation_off">Translation off</string>
-    <string name="translation_gemini_failed">Gemini failed (%1$s). Translating on the device instead.</string>
+    <string name="translation_online_failed">%1$s failed (%2$s). Translating on the device instead.</string>
     <string name="translation_failed">Translation failed: %1$s</string>
     <string name="translation_no_text">No text found on this page. Check the language set in Translate from.</string>
     <string name="pref_translate_from">Translate from</string>
@@ -526,6 +526,15 @@
     <string name="pref_translation_engine">Translator</string>
     <string name="translation_engine_on_device">On the device</string>
     <string name="translation_engine_gemini">Gemini (online)</string>
+    <string name="translation_engine_openrouter">OpenRouter (online)</string>
+    <string name="translation_engine_deepl">DeepL (online)</string>
+    <string name="pref_openrouter_summary">A language model of your choice on OpenRouter translates the text read on the device, with the chapter so far as context. Get a key at openrouter.ai. Models ending in :free cost nothing.</string>
+    <string name="pref_openrouter_api_key">OpenRouter API key</string>
+    <string name="pref_openrouter_model">OpenRouter model</string>
+    <string name="pref_deepl_summary">DeepL translates the text read on the device. Get a key at deepl.com, the free plan allows 500,000 characters a month.</string>
+    <string name="pref_deepl_api_key">DeepL API key</string>
+    <string name="pref_series_engine">Translator for this series</string>
+    <string name="pref_series_engine_default">As in settings</string>
     <string name="pref_gemini_summary">Gemini reads each page with the chapter so far as context. Get a free API key at aistudio.google.com. Pages are sent to Google, which may use them to improve its products on the free tier. When Gemini fails, for example out of free quota, pages are translated on the device.</string>
     <string name="pref_gemini_api_key">Gemini API key</string>
     <string name="pref_gemini_model">Gemini model</string>

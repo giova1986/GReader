@@ -42,6 +42,8 @@ class PageTranslator(
     private val directory = File(context.filesDir, "translation")
     private val mlKit = MlKitTextTranslator()
     private val gemini = GeminiTextTranslator(client)
+    private val openRouter = OpenRouterTextTranslator(client)
+    private val deepL = DeepLTextTranslator(client)
     private val detector = BubbleDetector(client, directory)
     private val painter = BubblePainter(
         ResourcesCompat.getFont(context, R.font.comic_neue_bold) ?: Typeface.DEFAULT_BOLD,
@@ -152,18 +154,52 @@ class PageTranslator(
     ): Pair<List<TranslatedText>, Boolean> {
         val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
         val regions by lazy { regions(bitmap, settings) }
+        if (settings.engine == TranslationEngine.ML_KIT) {
+            return mlKit.translate(bitmap, settings, regions, glossary) to true
+        }
+        return try {
+            translateOnline(bitmap, settings, chapter, glossary, regions) to true
+        } catch (e: Exception) {
+            // Out of free quota or offline, the page is still worth translating on the device
+            logcat(LogPriority.WARN, e) { "${settings.engine} failed, translating with ML Kit" }
+            mutableProblems.tryEmit(TranslationProblem.OnlineFailed(settings.engine, e.message ?: e.javaClass.simpleName))
+            mlKit.translate(bitmap, settings, regions, glossary) to false
+        }
+    }
+
+    private fun translateOnline(
+        bitmap: Bitmap,
+        settings: TranslationSettings,
+        chapter: Chapter?,
+        glossary: Glossary,
+        regions: List<TextRegion>,
+    ): List<TranslatedText> {
         return when (settings.engine) {
-            TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions, glossary) to true
-            TranslationEngine.GEMINI -> try {
+            TranslationEngine.ML_KIT -> error("ML Kit is not online")
+            TranslationEngine.GEMINI -> {
                 val (found, names) = gemini.translate(bitmap, settings, chapter?.id, glossary)
                 chapter?.let { glossaries.learn(it.mangaId, names) }
-                inBubbles(found, regions) to true
-            } catch (e: Exception) {
-                // Out of free quota or offline, the page is still worth translating on the device
-                logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
-                mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
-                mlKit.translate(bitmap, settings, regions, glossary) to false
+                inBubbles(found, regions)
             }
+            TranslationEngine.OPENROUTER -> {
+                val texts = mlKit.read(bitmap, settings.from, regions)
+                if (texts.isEmpty()) return emptyList()
+                val originals = texts.map { it.text }
+                val (translations, names) = openRouter.translate(originals, settings, chapter?.id, glossary)
+                chapter?.let { glossaries.learn(it.mangaId, names) }
+                withTranslations(texts, translations)
+            }
+            TranslationEngine.DEEPL -> {
+                val texts = mlKit.read(bitmap, settings.from, regions)
+                if (texts.isEmpty()) return emptyList()
+                withTranslations(texts, deepL.translate(texts.map { glossary.applyTo(it.text) }, settings))
+            }
+        }
+    }
+
+    private fun withTranslations(texts: List<TranslatedText>, translations: List<String>): List<TranslatedText> {
+        return texts.zip(translations).mapNotNull { (text, translation) ->
+            translation.trim().takeIf { it.isNotEmpty() }?.let { text.copy(text = it) }
         }
     }
 
@@ -243,6 +279,8 @@ class PageTranslator(
         val engineKey = when (engine) {
             TranslationEngine.ML_KIT -> "mlkit"
             TranslationEngine.GEMINI -> "gemini-${geminiModel.trim()}"
+            TranslationEngine.OPENROUTER -> "openrouter-${openRouterModel.trim()}"
+            TranslationEngine.DEEPL -> "deepl"
         }
         return "$PAINTING-${from.name}-$to-$engineKey-$detectBubbles".replace(Regex("[^A-Za-z0-9._-]"), "_")
     }

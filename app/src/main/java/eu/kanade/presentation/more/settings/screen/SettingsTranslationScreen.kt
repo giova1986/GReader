@@ -11,6 +11,7 @@ import eu.kanade.presentation.reader.settings.GeminiModelList
 import eu.kanade.presentation.reader.settings.description
 import eu.kanade.presentation.reader.settings.languageName
 import eu.kanade.presentation.reader.settings.rememberGeminiModels
+import eu.kanade.presentation.reader.settings.rememberOpenRouterModels
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import kotlinx.serialization.Serializable
@@ -34,6 +35,10 @@ data object SettingsTranslationScreen : SearchableSettings {
         val apiKey by readerPref.geminiApiKey.collectAsState()
         val model by readerPref.geminiModel.collectAsState()
         val models = rememberGeminiModels(apiKey)
+        val openRouterKey by readerPref.openRouterApiKey.collectAsState()
+        val openRouterModel by readerPref.openRouterModel.collectAsState()
+        val openRouterModels = rememberOpenRouterModels()
+        val deeplKey by readerPref.deeplApiKey.collectAsState()
         val ids = (models as? GeminiModelList.Loaded)?.ids.orEmpty()
         val targets = remember {
             TranslateLanguage.getAllLanguages().sortedBy(::languageName).associateWith(::languageName)
@@ -78,8 +83,7 @@ data object SettingsTranslationScreen : SearchableSettings {
                     Preference.PreferenceItem.EditTextPreference(
                         preference = readerPref.geminiApiKey,
                         title = stringResource(MR.strings.pref_gemini_api_key),
-                        // Keeps the key off the screen.
-                        subtitle = if (apiKey.isEmpty()) null else "•".repeat(12) + apiKey.takeLast(4),
+                        subtitle = masked(apiKey),
                     ),
                     if (ids.isEmpty()) {
                         Preference.PreferenceItem.EditTextPreference(
@@ -96,6 +100,45 @@ data object SettingsTranslationScreen : SearchableSettings {
                     Preference.PreferenceItem.InfoPreference(models.description()),
                 ),
             ),
+            Preference.PreferenceGroup(
+                title = stringResource(MR.strings.translation_engine_openrouter),
+                visible = engine == TranslationEngine.OPENROUTER,
+                preferenceItems = listOf(
+                    Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.pref_openrouter_summary)),
+                    Preference.PreferenceItem.EditTextPreference(
+                        preference = readerPref.openRouterApiKey,
+                        title = stringResource(MR.strings.pref_openrouter_api_key),
+                        subtitle = masked(openRouterKey),
+                    ),
+                    if (openRouterModels.isEmpty()) {
+                        Preference.PreferenceItem.EditTextPreference(
+                            preference = readerPref.openRouterModel,
+                            title = stringResource(MR.strings.pref_openrouter_model),
+                        )
+                    } else {
+                        Preference.PreferenceItem.ListPreference(
+                            preference = readerPref.openRouterModel,
+                            entries = (listOf(openRouterModel) + openRouterModels).distinct().associateWith { it },
+                            title = stringResource(MR.strings.pref_openrouter_model),
+                        )
+                    },
+                ),
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(MR.strings.translation_engine_deepl),
+                visible = engine == TranslationEngine.DEEPL,
+                preferenceItems = listOf(
+                    Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.pref_deepl_summary)),
+                    Preference.PreferenceItem.EditTextPreference(
+                        preference = readerPref.deeplApiKey,
+                        title = stringResource(MR.strings.pref_deepl_api_key),
+                        subtitle = masked(deeplKey),
+                    ),
+                ),
+            ),
         )
     }
+
+    /** Keeps a key off the screen. */
+    private fun masked(key: String): String? = if (key.isEmpty()) null else "•".repeat(12) + key.takeLast(4)
 }
