@@ -294,6 +294,11 @@ class ReaderPreferences(
 
     val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.1-flash-lite")
 
+    /** The glossary of a series, as lines of `original = translation`. */
+    fun translationGlossary(mangaId: Long): Preference<String> {
+        return preferenceStore.getString("pref_translation_glossary_$mangaId", "")
+    }
+
     fun translationSettings() = TranslationSettings(
         enabled = translatePages.get(),
         engine = translationEngine.get(),

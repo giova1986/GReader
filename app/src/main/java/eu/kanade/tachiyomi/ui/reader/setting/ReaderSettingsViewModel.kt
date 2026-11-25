@@ -6,6 +6,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
 import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.SeriesGlossaries
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.NavigationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
@@ -297,7 +298,7 @@ class ReaderSettingsViewModel(
     /**
      * Translates pages for the viewers, kept here so its models stay loaded across viewers.
      */
-    val pageTranslator = PageTranslator(client, modelDirectory)
+    val pageTranslator = PageTranslator(client, modelDirectory, SeriesGlossaries(preferences))
 
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 

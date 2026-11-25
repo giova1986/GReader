@@ -1,18 +1,29 @@
 package eu.kanade.presentation.reader.settings
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.google.mlkit.nl.translate.TranslateLanguage
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
+import eu.kanade.tachiyomi.ui.reader.translation.Glossary
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
 import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.translation.fetchGeminiModels
@@ -148,7 +159,79 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
         selectedIndex = targets.indexOf(translateTo),
         onSelect = { viewModel.preferences.translateTo.set(targets[it]) },
     )
+
+    val manga by viewModel.mangaFlow.collectAsState()
+    manga?.let { GlossaryItem(viewModel, it.id) }
 }
+
+/**
+ * Opens the glossary of the series being read, where translation keeps the names it finds and the user can set
+ * their own.
+ */
+@Composable
+private fun GlossaryItem(viewModel: ReaderSettingsViewModel, mangaId: Long) {
+    val preference = remember(mangaId) { viewModel.preferences.translationGlossary(mangaId) }
+    val text by preference.collectAsState()
+    var editing by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { editing = true }
+            .padding(horizontal = SettingsItemsPaddings.Horizontal, vertical = SettingsItemsPaddings.Vertical),
+    ) {
+        Text(text = stringResource(MR.strings.pref_translation_glossary), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(MR.strings.pref_translation_glossary_summary, Glossary.parse(text).terms.size),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (editing) {
+        var draft by remember { mutableStateOf(text) }
+        AlertDialog(
+            onDismissRequest = { editing = false },
+            title = { Text(stringResource(MR.strings.pref_translation_glossary)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(MR.strings.pref_translation_glossary_help),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        minLines = GLOSSARY_LINES,
+                        maxLines = GLOSSARY_LINES * 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        preference.set(Glossary.parse(draft).format())
+                        // Pages translated with the old names would otherwise be shown again
+                        viewModel.pageTranslator.forget(mangaId)
+                        editing = false
+                    },
+                ) {
+                    Text(stringResource(MR.strings.action_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editing = false }) {
+                    Text(stringResource(MR.strings.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+private const val GLOSSARY_LINES = 6
 
 internal fun languageName(code: String): String {
     val locale = Locale.getDefault()

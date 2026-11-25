@@ -17,6 +17,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.SeriesGlossaries
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.DiskUtil.NOMEDIA_FILE
 import eu.kanade.tachiyomi.util.storage.saveTo
@@ -422,11 +423,12 @@ class Downloader(
             .filter { file -> file.isFile && ImageUtil.isImage(file.name) { file.openInputStream() } }
             .sortedBy { it.name }
         withContext(Dispatchers.IO) {
-            PageTranslator(networkHelper.client, File(context.filesDir, "translation")).use { translator ->
+            val glossaries = SeriesGlossaries(readerPreferences)
+            PageTranslator(networkHelper.client, File(context.filesDir, "translation"), glossaries).use { translator ->
                 pages.forEach { page ->
                     ensureActive()
                     val image = Buffer().apply { page.openInputStream().source().use { writeAll(it) } }
-                    translator.translatePage(image, settings, download.chapter.id)
+                    translator.translatePage(image, settings, download.chapter)
                 }
             }
         }

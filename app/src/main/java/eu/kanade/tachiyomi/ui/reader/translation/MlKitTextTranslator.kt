@@ -23,12 +23,13 @@ class MlKitTextTranslator : Closeable {
 
     /**
      * Lines within one of [regions] are read together and the translation fills the region, while other lines are
-     * grouped as ML Kit sees blocks of text.
+     * grouped as ML Kit sees blocks of text. The terms of [glossary] are put in before translating.
      */
     fun translate(
         bitmap: Bitmap,
         settings: TranslationSettings,
         regions: List<TextRegion> = emptyList(),
+        glossary: Glossary = Glossary.EMPTY,
     ): List<TranslatedText> {
         val lines = recognize(bitmap, settings.from)
         if (lines.isEmpty()) return emptyList()
@@ -45,7 +46,8 @@ class MlKitTextTranslator : Closeable {
         Tasks.await(translator.downloadModelIfNeeded())
 
         return blocks.mapNotNull { block ->
-            val translated = Tasks.await(translator.translate(block.text)).trim()
+            // Names put in already translated mostly pass through ML Kit as the glossary has them
+            val translated = Tasks.await(translator.translate(glossary.applyTo(block.text))).trim()
             if (translated.isEmpty()) null else TranslatedText(block.bounds, translated)
         }
     }

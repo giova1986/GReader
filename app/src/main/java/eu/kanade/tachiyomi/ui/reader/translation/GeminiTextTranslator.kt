@@ -39,12 +39,23 @@ class GeminiTextTranslator(
     /** The latest lines translated in each chapter, oldest first. */
     private val chapterLines = ConcurrentHashMap<Long, ArrayDeque<String>>()
 
-    fun translate(bitmap: Bitmap, settings: TranslationSettings, chapterId: Long?): List<TranslatedText> {
+    /**
+     * The translations of [bitmap], and the names Gemini found with how it translated them, for [glossary] to keep.
+     */
+    fun translate(
+        bitmap: Bitmap,
+        settings: TranslationSettings,
+        chapterId: Long?,
+        glossary: Glossary,
+    ): Pair<List<TranslatedText>, Map<String, String>> {
         val lines = chapterId?.let { chapterLines.getOrPut(it) { ArrayDeque() } }
         val translations = mutableListOf<TranslatedText>()
+        val names = mutableMapOf<String, String>()
         forEachTile(bitmap) { top, tile ->
             val context = lines?.let { synchronized(it) { it.joinToString("\n") } }.orEmpty()
-            val bubbles = request(tile, settings, context)
+            val page = request(tile, settings, context, glossary)
+            page.names.forEach { names[it.original.trim()] = it.translation.trim() }
+            val bubbles = page.bubbles
             bubbles.mapNotNullTo(translations) { bubble ->
                 val (yMin, xMin, yMax, xMax) = bubble.box.takeIf { it.size == 4 } ?: return@mapNotNullTo null
                 val bounds = Rect(
@@ -63,16 +74,16 @@ class GeminiTextTranslator(
                 }
             }
         }
-        return translations
+        return translations to names
     }
 
-    private fun request(image: Bitmap, settings: TranslationSettings, context: String): List<Bubble> {
+    private fun request(image: Bitmap, settings: TranslationSettings, context: String, glossary: Glossary): Page {
         val body = buildJsonObject {
             putJsonArray("contents") {
                 addJsonObject {
                     put("role", "user")
                     putJsonArray("parts") {
-                        addJsonObject { put("text", prompt(settings, context)) }
+                        addJsonObject { put("text", prompt(settings, context, glossary)) }
                         addJsonObject {
                             putJsonObject("inline_data") {
                                 put("mime_type", "image/jpeg")
@@ -108,15 +119,15 @@ class GeminiTextTranslator(
             json.decodeFromString<GenerateContentResponse>(text)
         }
         result.promptFeedback?.blockReason?.let { throw IOException("Blocked: $it") }
-        val candidate = result.candidates.firstOrNull() ?: return emptyList()
+        val candidate = result.candidates.firstOrNull() ?: return Page()
         val answer = candidate.content?.parts?.joinToString("") { it.text.orEmpty() }
         if (answer.isNullOrBlank()) {
             if (candidate.finishReason != null && candidate.finishReason != "STOP") {
                 throw IOException("Stopped: ${candidate.finishReason}")
             }
-            return emptyList()
+            return Page()
         }
-        return json.decodeFromString<List<Bubble>>(answer)
+        return json.decodeFromString<Page>(answer)
     }
 
     /**
@@ -131,7 +142,7 @@ class GeminiTextTranslator(
         return (message ?: body).take(MAX_ERROR_LENGTH)
     }
 
-    private fun prompt(settings: TranslationSettings, context: String): String {
+    private fun prompt(settings: TranslationSettings, context: String, glossary: Glossary): String {
         val from = Locale.forLanguageTag(settings.from.language).getDisplayName(Locale.ENGLISH)
         val to = Locale.forLanguageTag(settings.to).getDisplayName(Locale.ENGLISH)
         return buildString {
@@ -141,7 +152,13 @@ class GeminiTextTranslator(
             append("For each, give box_2d as [ymin, xmin, ymax, xmax] scaled to 0-1000, tightly around its text, ")
             append("the original text, and a natural $to translation that reads like a professional ")
             append("localization: keep character names, honorifics and tone consistent with the story so far. ")
-            append("Keep translations about as long as the original so they fit the bubble.")
+            append("Keep translations about as long as the original so they fit the bubble. ")
+            append("Also list in names every character, place or other proper name on the page, with how you ")
+            append("translated it.")
+            if (glossary.terms.isNotEmpty()) {
+                append("\n\nAlways translate these names and terms as given, as original = translation:\n")
+                append(glossary.format())
+            }
             if (context.isNotEmpty()) {
                 append("\n\nLines translated earlier in this chapter, as original => translation:\n")
                 append(context)
@@ -183,6 +200,12 @@ class GeminiTextTranslator(
     private data class Part(val text: String? = null)
 
     @Serializable
+    private data class Page(val bubbles: List<Bubble> = emptyList(), val names: List<Name> = emptyList())
+
+    @Serializable
+    private data class Name(val original: String = "", val translation: String = "")
+
+    @Serializable
     private data class Bubble(
         @SerialName("box_2d") val box: List<Int>,
         val original: String = "",
@@ -204,22 +227,45 @@ class GeminiTextTranslator(
         const val MAX_CONTEXT_LINES = 80
 
         val RESPONSE_SCHEMA = buildJsonObject {
-            put("type", "ARRAY")
-            putJsonObject("items") {
-                put("type", "OBJECT")
-                putJsonObject("properties") {
-                    putJsonObject("box_2d") {
-                        put("type", "ARRAY")
-                        putJsonObject("items") { put("type", "INTEGER") }
+            put("type", "OBJECT")
+            putJsonObject("properties") {
+                putJsonObject("bubbles") {
+                    put("type", "ARRAY")
+                    putJsonObject("items") {
+                        put("type", "OBJECT")
+                        putJsonObject("properties") {
+                            putJsonObject("box_2d") {
+                                put("type", "ARRAY")
+                                putJsonObject("items") { put("type", "INTEGER") }
+                            }
+                            putJsonObject("original") { put("type", "STRING") }
+                            putJsonObject("translation") { put("type", "STRING") }
+                        }
+                        putJsonArray("required") {
+                            add("box_2d")
+                            add("original")
+                            add("translation")
+                        }
                     }
-                    putJsonObject("original") { put("type", "STRING") }
-                    putJsonObject("translation") { put("type", "STRING") }
                 }
-                putJsonArray("required") {
-                    add("box_2d")
-                    add("original")
-                    add("translation")
+                putJsonObject("names") {
+                    put("type", "ARRAY")
+                    putJsonObject("items") {
+                        put("type", "OBJECT")
+                        putJsonObject("properties") {
+                            putJsonObject("original") { put("type", "STRING") }
+                            putJsonObject("translation") { put("type", "STRING") }
+                        }
+                        putJsonArray("required") {
+                            add("original")
+                            add("translation")
+                        }
+                    }
                 }
+            }
+            putJsonArray("required") {
+                add("bubbles")
+                add("names")
             }
         }
     }

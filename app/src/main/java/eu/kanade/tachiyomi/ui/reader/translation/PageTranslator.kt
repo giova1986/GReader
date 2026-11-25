@@ -24,6 +24,7 @@ import okio.sink
 import okio.source
 import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
+import tachiyomi.domain.chapter.model.Chapter
 import java.io.Closeable
 import java.io.File
 import kotlin.math.max
@@ -35,7 +36,11 @@ import kotlin.math.roundToInt
  * copy of the image, and keeps translated pages in [directory] so a page is translated once, ahead of reading for
  * downloaded chapters. Blocking, so never call it on the main thread.
  */
-class PageTranslator(client: OkHttpClient, private val directory: File) : Closeable {
+class PageTranslator(
+    client: OkHttpClient,
+    private val directory: File,
+    private val glossaries: SeriesGlossaries,
+) : Closeable {
 
     private val mlKit = MlKitTextTranslator()
     private val gemini = GeminiTextTranslator(client)
@@ -51,17 +56,18 @@ class PageTranslator(client: OkHttpClient, private val directory: File) : Closea
     /**
      * [image] translated when [settings] enable it, or [image] itself when it can't be: an animated image, or a
      * failure such as the language model not downloading while offline, so the page still shows. A page of
-     * [chapterId] gets the chapter's earlier pages as context where the engine uses it.
+     * [chapter] gets the chapter's earlier pages as context where the engine uses it, and its series' glossary.
      */
-    fun translatePage(image: BufferedSource, settings: TranslationSettings, chapterId: Long?): BufferedSource {
+    fun translatePage(image: BufferedSource, settings: TranslationSettings, chapter: Chapter?): BufferedSource {
         if (!settings.enabled || ImageUtil.isAnimatedAndSupported(image)) return image
-        val saved = File(pages, "${image.peek().readByteString().sha256().hex()}-${settings.pageKey()}.jpg")
+        val hash = image.peek().readByteString().sha256().hex()
+        val saved = File(pages, "${chapter?.mangaId ?: 0}-$hash-${settings.pageKey()}.jpg")
         if (saved.exists()) {
             saved.setLastModified(System.currentTimeMillis())
             return Buffer().apply { saved.source().use { writeAll(it) } }
         }
         return try {
-            val (translated, complete) = translate(image, settings, chapterId)
+            val (translated, complete) = translate(image, settings, chapter)
             if (complete) save(translated, saved)
             translated
         } catch (e: Exception) {
@@ -69,6 +75,13 @@ class PageTranslator(client: OkHttpClient, private val directory: File) : Closea
             mutableProblems.tryEmit(TranslationProblem.Failed(e.message ?: e.javaClass.simpleName))
             image
         }
+    }
+
+    /**
+     * Drops the translated pages of [mangaId], so they're translated again with its changed glossary.
+     */
+    fun forget(mangaId: Long) {
+        pages.listFiles().orEmpty().filter { it.name.startsWith("$mangaId-") }.forEach(File::delete)
     }
 
     override fun close() {
@@ -83,22 +96,25 @@ class PageTranslator(client: OkHttpClient, private val directory: File) : Closea
     private fun translate(
         image: BufferedSource,
         settings: TranslationSettings,
-        chapterId: Long?,
+        chapter: Chapter?,
     ): Pair<BufferedSource, Boolean> {
         val options = BitmapFactory.Options().apply { inMutable = true }
         val bitmap = BitmapFactory.decodeStream(image.peek().inputStream(), null, options) ?: return image to false
         try {
             var complete = true
+            val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
             val translations = when (settings.engine) {
-                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions(bitmap, settings))
+                TranslationEngine.ML_KIT -> mlKit.translate(bitmap, settings, regions(bitmap, settings), glossary)
                 TranslationEngine.GEMINI -> try {
-                    gemini.translate(bitmap, settings, chapterId)
+                    val (found, names) = gemini.translate(bitmap, settings, chapter?.id, glossary)
+                    chapter?.let { glossaries.learn(it.mangaId, names) }
+                    found
                 } catch (e: Exception) {
                     // Out of free quota or offline, the page is still worth translating on the device
                     logcat(LogPriority.WARN, e) { "Gemini failed, translating with ML Kit" }
                     mutableProblems.tryEmit(TranslationProblem.GeminiFailed(e.message ?: e.javaClass.simpleName))
                     complete = false
-                    mlKit.translate(bitmap, settings, regions(bitmap, settings))
+                    mlKit.translate(bitmap, settings, regions(bitmap, settings), glossary)
                 }
             }
             if (translations.isEmpty()) {
