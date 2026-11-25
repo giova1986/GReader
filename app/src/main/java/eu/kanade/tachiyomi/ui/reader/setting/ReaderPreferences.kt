@@ -6,6 +6,9 @@ import dev.icerock.moko.resources.StringResource
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationEngine
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSource
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShader
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuShaders
 import tachiyomi.core.common.preference.Preference
@@ -17,7 +20,7 @@ import tachiyomi.i18n.MR
 @Inject
 @SingleIn(AppScope::class)
 class ReaderPreferences(
-    preferenceStore: PreferenceStore,
+    private val preferenceStore: PreferenceStore,
 ) {
 
     // region General
@@ -262,6 +265,77 @@ class ReaderPreferences(
         WebGpuShaders::serialize,
         WebGpuShaders::deserialize,
     )
+
+    // endregion
+
+    // region Translation
+
+    val translatePages: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_pages", false)
+
+    val translateFrom: Preference<TranslationSource> = preferenceStore.getEnum(
+        "pref_translate_from",
+        TranslationSource.JAPANESE,
+    )
+
+    /** An ML Kit translate language code. */
+    val translateTo: Preference<String> = preferenceStore.getString("pref_translate_to", "it")
+
+    val detectBubbles: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_detect_bubbles", true)
+
+    /** Off by default, as its models are a download of about 120 MB. */
+    val mangaOcr: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_manga_ocr", false)
+
+    /** Whether chapters are translated once downloaded, so their pages are ready when read. */
+    val translateDownloads: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_downloads", true)
+
+    val translationEngine: Preference<TranslationEngine> = preferenceStore.getEnum(
+        "pref_translation_engine",
+        TranslationEngine.ML_KIT,
+    )
+
+    val geminiApiKey: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_gemini_api_key"))
+
+    val geminiModel: Preference<String> = preferenceStore.getString("pref_gemini_model", "gemini-3.1-flash-lite")
+
+    val openRouterApiKey: Preference<String> = preferenceStore.getString(
+        Preference.privateKey("pref_openrouter_api_key"),
+    )
+
+    val openRouterModel: Preference<String> = preferenceStore.getString("pref_openrouter_model", "")
+
+    val deeplApiKey: Preference<String> = preferenceStore.getString(Preference.privateKey("pref_deepl_api_key"))
+
+    /** The name of the [TranslationEngine] a series is translated with, or empty for [translationEngine]. */
+    fun seriesTranslationEngine(mangaId: Long): Preference<String> {
+        return preferenceStore.getString("pref_translation_engine_$mangaId", "")
+    }
+
+    /** The glossary of a series, as lines of `original = translation`. */
+    fun translationGlossary(mangaId: Long): Preference<String> {
+        return preferenceStore.getString("pref_translation_glossary_$mangaId", "")
+    }
+
+    /**
+     * The translation settings, with the engine [mangaId] is translated with when given.
+     */
+    fun translationSettings(mangaId: Long? = null) = TranslationSettings(
+        enabled = translatePages.get(),
+        engine = mangaId?.let { seriesEngineOf(it) } ?: translationEngine.get(),
+        from = translateFrom.get(),
+        to = translateTo.get(),
+        detectBubbles = detectBubbles.get(),
+        mangaOcr = mangaOcr.get(),
+        geminiApiKey = geminiApiKey.get(),
+        geminiModel = geminiModel.get(),
+        openRouterApiKey = openRouterApiKey.get(),
+        openRouterModel = openRouterModel.get(),
+        deeplApiKey = deeplApiKey.get(),
+    )
+
+    fun seriesEngineOf(mangaId: Long): TranslationEngine? {
+        val name = seriesTranslationEngine(mangaId).get()
+        return TranslationEngine.entries.find { it.name == name }
+    }
 
     // endregion
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Mihon</string>
+    <string name="app_name" translatable="false">Honyaku</string>
 
     <!-- Generic strings -->
     <string name="on">On</string>
@@ -508,6 +508,52 @@
     <string name="color_filter_a_value">Alpha</string>
     <string name="pref_always_show_chapter_transition">Always show chapter transition</string>
     <string name="pref_category_reading_mode">Reading mode</string>
+    <string name="pref_category_translation">Translation</string>
+    <string name="pref_translation_summary">Speech bubble language, translator, Gemini key</string>
+    <string name="pref_translate_pages">Translate pages</string>
+    <string name="pref_translate_pages_summary">The text of speech bubbles is read and translated on this device. Each language is downloaded once, then translation works offline.</string>
+    <string name="pref_translate_downloads">Translate downloaded chapters</string>
+    <string name="pref_translate_downloads_summary">Each chapter is translated as soon as it\'s downloaded, so its pages are ready when you read them. Translated pages are kept, up to 500 MB.</string>
+    <string name="pref_detect_bubbles">Detect speech bubbles</string>
+    <string name="pref_detect_bubbles_summary">Reads the text of each speech bubble together before translating it, with a model that runs on this device. It downloads once, about 11 MB.</string>
+    <string name="pref_manga_ocr">Read Japanese with manga-ocr</string>
+    <string name="pref_manga_ocr_summary">A model trained on manga reads vertical text, furigana and hand lettering better, on the device. It needs bubble detection and a one time download of about 120 MB.</string>
+    <string name="translation_on">Translation on</string>
+    <string name="translation_off">Translation off</string>
+    <string name="translation_online_failed">%1$s failed (%2$s). Translating on the device instead. Full text in Translation › Recent errors.</string>
+    <string name="translation_failed">Translation failed: %1$s. Full text in Translation › Recent errors.</string>
+    <string name="translation_rate_limited">%1$s refused more requests for now (too many per minute or used up for today). Pages are translated on the device for the next %2$d seconds. Flash-Lite models have higher free limits.</string>
+    <string name="translation_no_text">No text found on this page. Check the language set in Translate from.</string>
+    <string name="pref_translate_from">Translate from</string>
+    <string name="pref_translate_to">Translate to</string>
+    <string name="pref_translation_engine">Translator</string>
+    <string name="translation_engine_on_device">On the device</string>
+    <string name="translation_engine_gemini">Gemini (online)</string>
+    <string name="translation_engine_openrouter">OpenRouter (online)</string>
+    <string name="translation_engine_deepl">DeepL (online)</string>
+    <string name="pref_openrouter_summary">A language model of your choice on OpenRouter translates the text read on the device, with the chapter so far as context. Get a key at openrouter.ai. Models ending in :free cost nothing.</string>
+    <string name="pref_openrouter_api_key">OpenRouter API key</string>
+    <string name="pref_openrouter_model">OpenRouter model</string>
+    <string name="pref_deepl_summary">DeepL translates the text read on the device. Get a key at deepl.com, the free plan allows 500,000 characters a month.</string>
+    <string name="pref_deepl_api_key">DeepL API key</string>
+    <string name="pref_series_engine">Translator for this series</string>
+    <string name="pref_series_engine_default">As in settings</string>
+    <string name="pref_gemini_summary">Gemini reads each page with the chapter so far as context. Get a free API key at aistudio.google.com. Pages are sent to Google, which may use them to improve its products on the free tier. When Gemini fails, for example out of free quota, pages are translated on the device.</string>
+    <string name="pref_gemini_api_key">Gemini API key</string>
+    <string name="pref_gemini_model">Gemini model</string>
+    <string name="pref_gemini_models_no_key">Enter the API key to choose from Google's models</string>
+    <string name="pref_gemini_models_loading">Loading the models from Google…</string>
+    <string name="pref_gemini_models_found">%1$d models available from Google</string>
+    <string name="pref_gemini_models_failed">Couldn\'t load the models (%1$s). Type the model\'s name instead.</string>
+    <string name="pref_translation_glossary">Series glossary</string>
+    <string name="pref_translation_glossary_summary">%1$d names and terms always translated the same way</string>
+    <string name="pref_translation_glossary_help">One per line, as original = translation, for example ルフィ = Luffy. Gemini adds the names it finds. Saving translates this series\' pages again.</string>
+    <string name="pref_translation_correct">Correct this page</string>
+    <string name="pref_translation_correct_summary">Change the translation of a bubble on the page you\'re reading. To compare with the original, tap the globe in the menu.</string>
+    <string name="pref_translation_correct_none">This page hasn\'t been translated yet.</string>
+    <string name="pref_translation_errors">Recent errors</string>
+    <string name="pref_translation_errors_summary">The full text of the latest translation errors, to copy and send.</string>
+    <string name="pref_translation_errors_none">No errors since the reader was opened.</string>
     <string name="pref_category_reading">Reading</string>
     <string name="pref_webtoon_side_padding">Side padding</string>
     <string name="pref_hide_threshold">Sensitivity for hiding menu on scroll</string>

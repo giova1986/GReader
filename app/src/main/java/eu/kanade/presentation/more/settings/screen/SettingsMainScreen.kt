@@ -41,6 +41,7 @@ import mihon.icons.materialsymbols.rounded.Download
 import mihon.icons.materialsymbols.rounded.Explore
 import mihon.icons.materialsymbols.rounded.Info
 import mihon.icons.materialsymbols.rounded.Palette
+import mihon.icons.materialsymbols.rounded.Public
 import mihon.icons.materialsymbols.rounded.Search
 import mihon.icons.materialsymbols.rounded.Security
 import mihon.icons.materialsymbols.rounded.Storage
@@ -191,6 +192,12 @@ data object SettingsMainScreen : NavKey {
             subtitleRes = MR.strings.pref_reader_summary,
             icon = MaterialSymbols.AutoMirroredRounded.ChromeReaderMode,
             screen = SettingsReaderScreen,
+        ),
+        Item(
+            titleRes = MR.strings.pref_category_translation,
+            subtitleRes = MR.strings.pref_translation_summary,
+            icon = MaterialSymbols.Rounded.Public,
+            screen = SettingsTranslationScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_downloads,

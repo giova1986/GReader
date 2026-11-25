@@ -24,13 +24,15 @@ fun ReaderSettingsDialog(
     onShowMenus: () -> Unit,
     onHideMenus: () -> Unit,
     viewModel: ReaderSettingsViewModel,
+    initialPage: Int = 0,
 ) {
     val tabTitles = listOf(
         stringResource(MR.strings.pref_category_reading_mode),
         stringResource(MR.strings.pref_category_general),
         stringResource(MR.strings.custom_filter),
+        stringResource(MR.strings.pref_category_translation),
     )
-    val pagerState = rememberPagerState { tabTitles.size }
+    val pagerState = rememberPagerState(initialPage) { tabTitles.size }
 
     BoxWithConstraints {
         TabbedDialog(
@@ -63,6 +65,7 @@ fun ReaderSettingsDialog(
                     0 -> ReadingModePage(viewModel)
                     1 -> GeneralPage(viewModel)
                     2 -> ColorFilterPage(viewModel)
+                    3 -> TranslationPage(viewModel)
                 }
             }
         }

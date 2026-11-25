@@ -23,6 +23,8 @@ import eu.kanade.tachiyomi.ui.reader.model.InsertPage
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.setting.GeneralSettings
+import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LocalPageColorFilter
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView.ZoomStartPosition
@@ -66,6 +68,12 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      */
     val simplePaged: SimplePagedSettings
         get() = settingsViewModel.simplePaged.value
+
+    val translation: TranslationSettings
+        get() = settingsViewModel.translation.value
+
+    val pageTranslator: PageTranslator
+        get() = settingsViewModel.pageTranslator
 
     /**
      * Settings shared by every viewer, like allow taps or page transitions.
@@ -152,6 +160,19 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         }
         settingsViewModel.paged.collectChanges(scope) { old, new ->
             if (old != null && old.page != new.page) {
+                refreshAdapter()
+            }
+        }
+        settingsViewModel.translation.collectChanges(scope) { old, new ->
+            // Translating takes seconds, so the next pages are translated while the current one is read
+            pager.offscreenPageLimit = if (new.enabled) TRANSLATED_PAGES_AHEAD else 1
+            if (old != null) {
+                refreshAdapter()
+            }
+        }
+        // A corrected page or a changed glossary
+        settingsViewModel.pageTranslator.revision.collectChanges(scope) { old, _ ->
+            if (old != null) {
                 refreshAdapter()
             }
         }
@@ -311,3 +332,5 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 private class DisallowInterceptBarrier(context: Context) : FrameLayout(context) {
     override fun requestDisallowInterceptTouchEvent(disallowIntercept: Boolean) = Unit
 }
+
+private const val TRANSLATED_PAGES_AHEAD = 3

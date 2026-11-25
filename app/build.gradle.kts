@@ -35,7 +35,7 @@ android {
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "app.mihon"
+        applicationId = "app.honyaku"
 
         versionCode = 39
         versionName = "0.21.3"
@@ -310,6 +310,10 @@ dependencies {
     implementation(libs.reorderable)
     implementation(libs.bundles.markdown)
     implementation(libs.materialKolor)
+
+    // On-device OCR and translation of pages
+    implementation(libs.bundles.mlkit)
+    implementation(libs.onnxruntime.android)
 
     // Logging
     implementation(libs.logcat)

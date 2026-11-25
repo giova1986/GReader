@@ -1,10 +1,14 @@
 package eu.kanade.tachiyomi.ui.reader.setting
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel
+import eu.kanade.tachiyomi.ui.reader.translation.PageTranslator
+import eu.kanade.tachiyomi.ui.reader.translation.SeriesGlossaries
+import eu.kanade.tachiyomi.ui.reader.translation.TranslationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.LongStripSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.NavigationSettings
 import eu.kanade.tachiyomi.ui.reader.viewer.PagedSettings
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -29,6 +34,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
+import okhttp3.OkHttpClient
 import tachiyomi.core.common.preference.Preference
 import kotlin.time.Duration.Companion.seconds
 
@@ -40,6 +46,8 @@ class ReaderSettingsViewModel(
     private val readerViewModel: ReaderViewModel,
     val preferences: ReaderPreferences,
     private val basePreferences: BasePreferences,
+    client: OkHttpClient,
+    context: Context,
 ) : ViewModel() {
 
     val mangaFlow = readerViewModel.state
@@ -268,6 +276,54 @@ class ReaderSettingsViewModel(
         )
     }
 
+    private val typedTranslation = settings(
+        preferences.translatePages,
+        preferences.translateFrom,
+        preferences.translateTo,
+        preferences.detectBubbles,
+        preferences.mangaOcr,
+        preferences.translationEngine,
+        preferences.geminiApiKey,
+        preferences.geminiModel,
+        preferences.openRouterApiKey,
+        preferences.openRouterModel,
+        preferences.deeplApiKey,
+    ) {
+        translationSettings()
+    }
+
+    /** Changes when the series being read is given its own engine. */
+    private val seriesEngine = mangaFlow.flatMapLatest { manga ->
+        manga?.let { preferences.seriesTranslationEngine(it.id).changes() } ?: flowOf("")
+    }
+
+    /**
+     * Settings of the translation of pages, which every viewer but the WebGPU ones applies.
+     */
+    val translation = combine(typedTranslation, seriesEngine) { settings, _ -> settings.forSeries() }
+        // The keys and models are typed in, so pages aren't remade at every letter
+        .debounce(1.seconds)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, typedTranslation.value.forSeries())
+
+    private fun TranslationSettings.forSeries(): TranslationSettings {
+        val engine = readerViewModel.state.value.manga?.let { preferences.seriesEngineOf(it.id) } ?: return this
+        return copy(engine = engine)
+    }
+
+    /**
+     * Translates pages for the viewers, kept here so its models stay loaded across viewers.
+     */
+    val pageTranslator = PageTranslator(context, client, SeriesGlossaries(preferences))
+
+    /**
+     * The chapter id and index of the page being read, or null before a chapter loads.
+     */
+    fun currentPage(): Pair<Long, Int>? {
+        val state = readerViewModel.state.value
+        val chapterId = state.currentChapter?.chapter?.id ?: return null
+        return (chapterId to state.currentPage - 1).takeIf { it.second >= 0 }
+    }
+
     private val viewerMode = MutableStateFlow<ViewerMode?>(null)
 
     /**
@@ -327,6 +383,10 @@ class ReaderSettingsViewModel(
             .merge()
             .map { preferences.read() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, preferences.read())
+    }
+
+    override fun onCleared() {
+        pageTranslator.close()
     }
 
     private data class ViewerMode(
