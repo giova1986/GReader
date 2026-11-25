@@ -92,6 +92,14 @@ internal fun ColumnScope.TranslationPage(viewModel: ReaderSettingsViewModel) {
         ),
     )
 
+    if (translateFrom == TranslationSource.JAPANESE) {
+        CheckboxItem(
+            label = stringResource(MR.strings.pref_manga_ocr),
+            pref = viewModel.preferences.mangaOcr,
+        )
+        Summary(stringResource(MR.strings.pref_manga_ocr_summary))
+    }
+
     SettingsChipRow(MR.strings.pref_translation_engine) {
         TranslationEngine.entries.forEach {
             FilterChip(

@@ -516,6 +516,8 @@
     <string name="pref_translate_downloads_summary">Each chapter is translated as soon as it\'s downloaded, so its pages are ready when you read them. Translated pages are kept, up to 500 MB.</string>
     <string name="pref_detect_bubbles">Detect speech bubbles</string>
     <string name="pref_detect_bubbles_summary">Reads the text of each speech bubble together before translating it, with a model that runs on this device. It downloads once, about 11 MB.</string>
+    <string name="pref_manga_ocr">Read Japanese with manga-ocr</string>
+    <string name="pref_manga_ocr_summary">A model trained on manga reads vertical text, furigana and hand lettering better, on the device. It needs bubble detection and a one time download of about 120 MB.</string>
     <string name="translation_on">Translation on</string>
     <string name="translation_off">Translation off</string>
     <string name="translation_online_failed">%1$s failed (%2$s). Translating on the device instead.</string>

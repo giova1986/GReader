@@ -5,6 +5,7 @@ package eu.kanade.tachiyomi.ui.reader.translation
  *
  * @property to the ML Kit translate language code of the language pages are translated to.
  * @property detectBubbles whether text is grouped by the speech bubbles a model finds, rather than by ML Kit alone.
+ * @property mangaOcr whether Japanese text the bubble detector finds is read by manga-ocr rather than ML Kit.
  */
 data class TranslationSettings(
     val enabled: Boolean,
@@ -12,6 +13,7 @@ data class TranslationSettings(
     val from: TranslationSource,
     val to: String,
     val detectBubbles: Boolean,
+    val mangaOcr: Boolean,
     val geminiApiKey: String,
     val geminiModel: String,
     val openRouterApiKey: String,

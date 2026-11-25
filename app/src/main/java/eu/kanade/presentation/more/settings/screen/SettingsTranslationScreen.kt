@@ -70,6 +70,11 @@ data object SettingsTranslationScreen : SearchableSettings {
                 title = stringResource(MR.strings.pref_detect_bubbles),
                 subtitle = stringResource(MR.strings.pref_detect_bubbles_summary),
             ),
+            Preference.PreferenceItem.SwitchPreference(
+                preference = readerPref.mangaOcr,
+                title = stringResource(MR.strings.pref_manga_ocr),
+                subtitle = stringResource(MR.strings.pref_manga_ocr_summary),
+            ),
             Preference.PreferenceItem.ListPreference(
                 preference = readerPref.translationEngine,
                 entries = TranslationEngine.entries.associateWith { stringResource(it.titleRes) },

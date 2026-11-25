@@ -8,12 +8,8 @@ import ai.onnxruntime.TensorInfo
 import android.graphics.Bitmap
 import android.graphics.Rect
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okio.buffer
-import okio.sink
 import java.io.Closeable
 import java.io.File
-import java.io.IOException
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import kotlin.math.exp
@@ -31,7 +27,7 @@ class BubbleDetector(private val client: OkHttpClient, private val directory: Fi
     @Synchronized
     fun detect(bitmap: Bitmap): List<TextRegion> {
         val current = session ?: OrtSession.SessionOptions().use { options ->
-            environment.createSession(model().path, options)
+            environment.createSession(downloadOnce(client, directory, MODEL_NAME, MODEL_URL).path, options)
         }.also { session = it }
 
         val regions = mutableListOf<TextRegion>()
@@ -45,20 +41,6 @@ class BubbleDetector(private val client: OkHttpClient, private val directory: Fi
     override fun close() {
         session?.close()
         session = null
-    }
-
-    private fun model(): File {
-        val file = File(directory, MODEL_NAME)
-        if (file.exists()) return file
-
-        directory.mkdirs()
-        val partial = File(directory, "$MODEL_NAME.part")
-        client.newCall(Request.Builder().url(MODEL_URL).build()).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("Detector download failed: HTTP ${response.code}")
-            partial.sink().buffer().use { it.writeAll(response.body.source()) }
-        }
-        if (!partial.renameTo(file)) throw IOException("Could not save the detector")
-        return file
     }
 
     private fun detectTile(session: OrtSession, tile: Bitmap): List<TextRegion> {
@@ -85,7 +67,7 @@ class BubbleDetector(private val client: OkHttpClient, private val directory: Fi
                     fromPostProcessed(outputs.getValue("labels"), outputs.getValue("boxes"), outputs.getValue("scores"))
                 }
                 return detections
-                    .filter { it.score >= MIN_SCORE && it.label != TEXT_BUBBLE }
+                    .filter { it.score >= MIN_SCORE }
                     .mapNotNull { it.toRegion(tile.width, tile.height) }
             }
         } finally {
@@ -192,7 +174,13 @@ class BubbleDetector(private val client: OkHttpClient, private val directory: Fi
             (bottom * scaleY).roundToInt().coerceIn(0, height),
         )
         if (bounds.isEmpty) return null
-        return TextRegion(bounds, isBubble = label == BUBBLE)
+        val kind = when (label) {
+            BUBBLE -> TextRegion.Kind.BUBBLE
+            TEXT_BUBBLE -> TextRegion.Kind.BUBBLE_TEXT
+            TEXT_FREE -> TextRegion.Kind.FREE_TEXT
+            else -> return null
+        }
+        return TextRegion(bounds, kind)
     }
 
     private fun sigmoid(value: Float) = 1 / (1 + exp(-value))
@@ -215,10 +203,17 @@ class BubbleDetector(private val client: OkHttpClient, private val directory: Fi
         const val MIN_SCORE = 0.4f
         const val BUBBLE = 0
         const val TEXT_BUBBLE = 1
+        const val TEXT_FREE = 2
     }
 }
 
 /**
- * A speech bubble, or text outside of one, whose lines are read and translated together.
+ * A speech bubble, the text within one, or text outside of one, whose lines are read and translated together.
  */
-data class TextRegion(val bounds: Rect, val isBubble: Boolean)
+data class TextRegion(val bounds: Rect, val kind: Kind) {
+
+    val isBubble: Boolean
+        get() = kind == Kind.BUBBLE
+
+    enum class Kind { BUBBLE, BUBBLE_TEXT, FREE_TEXT }
+}

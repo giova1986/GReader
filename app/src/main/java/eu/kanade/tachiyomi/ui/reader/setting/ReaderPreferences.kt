@@ -282,6 +282,9 @@ class ReaderPreferences(
 
     val detectBubbles: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_detect_bubbles", true)
 
+    /** Off by default, as its models are a download of about 120 MB. */
+    val mangaOcr: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_manga_ocr", false)
+
     /** Whether chapters are translated once downloaded, so their pages are ready when read. */
     val translateDownloads: Preference<Boolean> = preferenceStore.getBoolean("pref_translate_downloads", true)
 
@@ -321,6 +324,7 @@ class ReaderPreferences(
         from = translateFrom.get(),
         to = translateTo.get(),
         detectBubbles = detectBubbles.get(),
+        mangaOcr = mangaOcr.get(),
         geminiApiKey = geminiApiKey.get(),
         geminiModel = geminiModel.get(),
         openRouterApiKey = openRouterApiKey.get(),

@@ -28,19 +28,19 @@ class MlKitTextTranslator : Closeable {
     fun read(bitmap: Bitmap, source: TranslationSource, regions: List<TextRegion> = emptyList()): List<TranslatedText> {
         val lines = recognize(bitmap, source)
         if (lines.isEmpty()) return emptyList()
-        return group(lines, regions, source).map { it.copy(original = it.text) }
+        // A bubble's text box would split its lines from the bubble they're grouped by
+        val groups = regions.filter { it.kind != TextRegion.Kind.BUBBLE_TEXT }
+        return group(lines, groups, source).map { it.copy(original = it.text) }
     }
 
     /**
-     * The text of [bitmap] read as [read] does and translated, with the terms of [glossary] put in before.
+     * [blocks] of text read from a page translated, with the terms of [glossary] put in before.
      */
     fun translate(
-        bitmap: Bitmap,
+        blocks: List<TranslatedText>,
         settings: TranslationSettings,
-        regions: List<TextRegion> = emptyList(),
-        glossary: Glossary = Glossary.EMPTY,
+        glossary: Glossary,
     ): List<TranslatedText> {
-        val blocks = read(bitmap, settings.from, regions)
         if (blocks.isEmpty()) return emptyList()
 
         val translator = translators.getOrPut(settings.from.language to settings.to) {

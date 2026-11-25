@@ -45,6 +45,7 @@ class PageTranslator(
     private val openRouter = OpenRouterTextTranslator(client)
     private val deepL = DeepLTextTranslator(client)
     private val detector = BubbleDetector(client, directory)
+    private val mangaOcr = MangaOcr(client, directory)
     private val painter = BubblePainter(
         ResourcesCompat.getFont(context, R.font.comic_neue_bold) ?: Typeface.DEFAULT_BOLD,
     )
@@ -141,6 +142,7 @@ class PageTranslator(
     override fun close() {
         mlKit.close()
         detector.close()
+        mangaOcr.close()
     }
 
     /**
@@ -154,17 +156,18 @@ class PageTranslator(
     ): Pair<List<TranslatedText>, Boolean> {
         val glossary = chapter?.let { glossaries.of(it.mangaId) } ?: Glossary.EMPTY
         val regions by lazy { regions(bitmap, settings) }
+        val texts by lazy { read(bitmap, settings, regions) }
         if (settings.engine == TranslationEngine.ML_KIT) {
-            return mlKit.translate(bitmap, settings, regions, glossary) to true
+            return mlKit.translate(texts, settings, glossary) to true
         }
         return try {
-            translateOnline(bitmap, settings, chapter, glossary, regions) to true
+            translateOnline(bitmap, settings, chapter, glossary, regions) { texts } to true
         } catch (e: Exception) {
             // Out of free quota or offline, the page is still worth translating on the device
             logcat(LogPriority.WARN, e) { "${settings.engine} failed, translating with ML Kit" }
             val reason = e.message ?: e.javaClass.simpleName
             mutableProblems.tryEmit(TranslationProblem.OnlineFailed(settings.engine, reason))
-            mlKit.translate(bitmap, settings, regions, glossary) to false
+            mlKit.translate(texts, settings, glossary) to false
         }
     }
 
@@ -174,6 +177,7 @@ class PageTranslator(
         chapter: Chapter?,
         glossary: Glossary,
         regions: List<TextRegion>,
+        readTexts: () -> List<TranslatedText>,
     ): List<TranslatedText> {
         return when (settings.engine) {
             TranslationEngine.ML_KIT -> error("ML Kit is not online")
@@ -183,7 +187,7 @@ class PageTranslator(
                 inBubbles(found, regions)
             }
             TranslationEngine.OPENROUTER -> {
-                val texts = mlKit.read(bitmap, settings.from, regions)
+                val texts = readTexts()
                 if (texts.isEmpty()) return emptyList()
                 val originals = texts.map { it.text }
                 val (translations, names) = openRouter.translate(originals, settings, chapter?.id, glossary)
@@ -191,7 +195,7 @@ class PageTranslator(
                 withTranslations(texts, translations)
             }
             TranslationEngine.DEEPL -> {
-                val texts = mlKit.read(bitmap, settings.from, regions)
+                val texts = readTexts()
                 if (texts.isEmpty()) return emptyList()
                 withTranslations(texts, deepL.translate(texts.map { glossary.applyTo(it.text) }, settings))
             }
@@ -278,10 +282,10 @@ class PageTranslator(
      */
     private fun TranslationSettings.pageKey(): String {
         val engineKey = when (engine) {
-            TranslationEngine.ML_KIT -> "mlkit"
+            TranslationEngine.ML_KIT -> "mlkit-$mangaOcr"
             TranslationEngine.GEMINI -> "gemini-${geminiModel.trim()}"
-            TranslationEngine.OPENROUTER -> "openrouter-${openRouterModel.trim()}"
-            TranslationEngine.DEEPL -> "deepl"
+            TranslationEngine.OPENROUTER -> "openrouter-${openRouterModel.trim()}-$mangaOcr"
+            TranslationEngine.DEEPL -> "deepl-$mangaOcr"
         }
         return "$PAINTING-${from.name}-$to-$engineKey-$detectBubbles".replace(Regex("[^A-Za-z0-9._-]"), "_")
     }
@@ -298,6 +302,21 @@ class PageTranslator(
             logcat(LogPriority.WARN, e) { "Bubble detection failed" }
             emptyList()
         }
+    }
+
+    /**
+     * The untranslated text of [bitmap], read by manga-ocr when [settings] ask for it and the detector found where
+     * the text is, or else by ML Kit, which is also used when manga-ocr can't run, such as before its download.
+     */
+    private fun read(bitmap: Bitmap, settings: TranslationSettings, regions: List<TextRegion>): List<TranslatedText> {
+        if (settings.mangaOcr && settings.from == TranslationSource.JAPANESE && regions.isNotEmpty()) {
+            try {
+                return mangaOcr.read(bitmap, regions)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "manga-ocr failed, reading with ML Kit" }
+            }
+        }
+        return mlKit.read(bitmap, settings.from, regions)
     }
 
     /**

@@ -399,6 +399,8 @@
     <string name="pref_translate_downloads_summary">Ogni capitolo viene tradotto appena scaricato, così le pagine sono pronte quando le leggi. Le pagine tradotte vengono conservate, fino a 500 MB.</string>
     <string name="pref_detect_bubbles">Riconosci i fumetti</string>
     <string name="pref_detect_bubbles_summary">Legge insieme tutto il testo di ogni fumetto prima di tradurlo, con un modello che funziona su questo dispositivo. Si scarica una volta, circa 11 MB.</string>
+    <string name="pref_manga_ocr">Leggi il giapponese con manga-ocr</string>
+    <string name="pref_manga_ocr_summary">Un modello addestrato sui manga legge meglio testo verticale, furigana e scritte a mano, sul telefono. Serve il riconoscimento dei balloon e un download di circa 120 MB la prima volta.</string>
     <string name="translation_on">Traduzione attiva</string>
     <string name="translation_off">Traduzione disattivata</string>
     <string name="translation_online_failed">%1$s non ha funzionato (%2$s). Traduco sul dispositivo.</string>

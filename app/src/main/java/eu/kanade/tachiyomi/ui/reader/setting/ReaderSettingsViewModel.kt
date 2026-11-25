@@ -281,6 +281,7 @@ class ReaderSettingsViewModel(
         preferences.translateFrom,
         preferences.translateTo,
         preferences.detectBubbles,
+        preferences.mangaOcr,
         preferences.translationEngine,
         preferences.geminiApiKey,
         preferences.geminiModel,
