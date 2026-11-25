@@ -61,6 +61,25 @@ jobs:
           name: test-report-${{ github.sha }}
           path: app/build/reports/tests/testDebugUnitTest
 
+      # Every runner makes its own debug key, and Android only installs an update signed with the same key, so the
+      # APK is signed with the key kept in the repository's secrets when there is one
+      - name: Use the Honyaku signing key
+        env:
+          HONYAKU_KEYSTORE: ${{ secrets.HONYAKU_KEYSTORE }}
+          HONYAKU_KEYSTORE_PASSWORD: ${{ secrets.HONYAKU_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$HONYAKU_KEYSTORE" ]; then
+            echo "::warning::No HONYAKU_KEYSTORE secret, so this APK won't install over the previous one"
+            exit 0
+          fi
+          echo "$HONYAKU_KEYSTORE" | base64 -d > "$RUNNER_TEMP/honyaku.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/honyaku.jks"
+            echo "storePassword=$HONYAKU_KEYSTORE_PASSWORD"
+            echo "keyAlias=honyaku"
+            echo "keyPassword=$HONYAKU_KEYSTORE_PASSWORD"
+          } > keystore.properties
+
       - name: Build app
         run: ./gradlew assembleRelease -Pdist=ci
 
